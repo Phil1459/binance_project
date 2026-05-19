@@ -8,8 +8,9 @@ BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET")
 
 BINANCE_TESTNET = os.getenv("BINANCE_TESTNET") == "true"
 
-SYMBOL = os.getenv("SYMBOL", "BTCUSDT")
+SYMBOL = os.getenv("SYMBOL", "BTCUSDT").upper()
+DATABASE_PATH = str(os.getenv("DATABASE_PATH", "data/trades.sqlite"))
 
 ENABLE_TRADING = os.getenv("ENABLE_TRADING") == "true"
 
-TRADE_SIZE_USDT = float(os.getenv("TRADE_SIZE_USDT", 25))
+TRADE_SIZE_USDT = float(os.getenv("TRADE_SIZE_USDT", float(25)))
