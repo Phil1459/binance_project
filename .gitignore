@@ -3,17 +3,24 @@
 
 # Environment / Secrets
 .env
+.env.sync
 
 # Python cache
 __pycache__/
 *.py[codz]
 
 # Data
-data/
+data/*.sqlite
+data/raw/*.sqlite-*
+data/*.db
+data/*.parquet
 
 # Logs
 logs/
 *.log
+
+# Docs
+docs/*.md
 
 # Databases
 *.db
@@ -27,6 +34,8 @@ logs/
 
 # Jupyter
 .ipynb_checkpoints/
+notebooks/*
+!notebooks/*.ipynb
 
 # Obsidian
 .obsidian/
