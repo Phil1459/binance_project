@@ -3,7 +3,7 @@ import json
 import time
 import websockets
 
-from config.settings import SYMBOL, DATABASE_DIR
+from config.settings import SYMBOLS, RAW_DIR
 from config.logging_setup import setup_logger
 from src.db import connect_db, insert_trades, daily_database_path
 
@@ -16,24 +16,28 @@ logger = setup_logger(
     log_file="logs/trade_collector.log",
 )
 
+def trade_stream_url(symbols: list[str]) -> str:
+    streams = "/".join(
+        f"{symbol.lower()}@trade"
+        for symbol in symbols
+    )
+    return f"wss://stream.binance.com:9443/stream?streams={streams}"
 
-def trade_stream_url(symbol: str) -> str:
-    stream_symbol = symbol.lower()
-    return f"wss://stream.binance.com:9443/ws/{stream_symbol}@trade"
 
 async def collect_trades() -> None:
-    url = trade_stream_url(SYMBOL)
+    url = trade_stream_url(SYMBOLS)
 
-    current_db_path = daily_database_path(DATABASE_DIR)
+    current_db_path = daily_database_path(RAW_DIR)
     conn = connect_db(current_db_path)
 
     buffer: list[dict] = []
     last_flush = time.monotonic()
+    
     total_received = 0
     total_flushed = 0
 
     logger.info("Starting trade collector")
-    logger.info("Symbol: %s", SYMBOL)
+    logger.info("Symbols: %s", ", ".join(SYMBOLS))
     logger.info("Database path: %s", current_db_path)
     logger.info("WebSocket URL: %s", url)
 
@@ -49,19 +53,26 @@ async def collect_trades() -> None:
                     logger.info("Connected to Binance WebSocket")
 
                     async for message in websocket:
-                        msg = json.loads(message)
+                        raw_msg = json.loads(message)
+                        
+                        # Combined streams wrap the trade payload in "data"
+                        msg = raw_msg["data"]
+
                         buffer.append(msg)
                         total_received += 1
 
-                        new_db_path = daily_database_path(DATABASE_DIR)
+                        new_db_path = daily_database_path(RAW_DIR)
 
                         if new_db_path != current_db_path:
                             if buffer:
+                                batch_size = len(buffer)
                                 insert_trades(conn, buffer)
-                                total_flushed += len(buffer)
+                                total_flushed += batch_size
                                 buffer.clear()
 
+                            conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
                             conn.close()
+
                             current_db_path = new_db_path
                             conn = connect_db(current_db_path)
                             last_flush = time.monotonic()
@@ -71,26 +82,22 @@ async def collect_trades() -> None:
                         now = time.monotonic()
 
                         should_flush_by_size = len(buffer) >= BATCH_SIZE
-                        should_flush_by_time = (now - last_flush) >= FLUSH_INTERVAL_SECONDS
+                        should_flush_by_time = (
+                            now - last_flush
+                        ) >= FLUSH_INTERVAL_SECONDS
 
                         if should_flush_by_size or should_flush_by_time:
                             batch_size = len(buffer)
                             insert_trades(conn, buffer)
                             total_flushed += batch_size
-
-                            last_msg = buffer[-1]
                             buffer.clear()
                             last_flush = now
 
                             logger.debug(
-                                "Stored batch=%d total_received=%d total_flushed=%d "
-                                "last_trade_id=%s price=%s quantity=%s",
+                                "Stored batch=%d total_received=%d total_flushed=%d",
                                 batch_size,
                                 total_received,
                                 total_flushed,
-                                last_msg["t"],
-                                last_msg["p"],
-                                last_msg["q"],
                             )
 
             except Exception:
@@ -132,6 +139,7 @@ async def collect_trades() -> None:
             except Exception:
                 logger.exception("Failed to flush final buffer during shutdown")
 
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
         conn.close()
 
         logger.info(
