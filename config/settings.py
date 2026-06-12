@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+from pathlib import Path
 import os
 
 load_dotenv()
@@ -8,8 +9,15 @@ BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET")
 
 BINANCE_TESTNET = os.getenv("BINANCE_TESTNET") == "true"
 
-SYMBOL = os.getenv("SYMBOL", "BTCUSDT").upper()
-DATABASE_DIR = os.getenv("DATABASE_DIR", "data/raw")
+SYMBOLS = [
+    symbol.strip().upper()
+    for symbol in os.getenv("SYMBOLS", "BTCUSDT").split(",")
+    if symbol.strip()
+]
+
+RAW_DIR = Path(os.getenv("RAW_DIR", "data/raw"))
+PROCESSED_DIR = Path(os.getenv("PROCESSED_DIR", "data/processed"))
+
 
 ENABLE_TRADING = os.getenv("ENABLE_TRADING") == "true"
 
