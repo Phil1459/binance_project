@@ -35,7 +35,7 @@ docs/*.md
 # Jupyter
 .ipynb_checkpoints/
 notebooks/*
-#!notebooks/*.ipynb #temporary bc its messy
+!notebooks/*.ipynb
 
 # Obsidian
 .obsidian/
