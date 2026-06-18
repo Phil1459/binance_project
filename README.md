@@ -4,6 +4,8 @@ Realtime crypto trading research framework using Binance WebSocket streams.
 
 The goal is to understand market structure based on raw trade data, derive useful signals, and test my own trading ideas for strategies.
 
+There are some executed Jupyter-Notebooks that provide insights.
+
 This project is experimental and under active development.
 
 ## Setup
