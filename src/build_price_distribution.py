@@ -1,11 +1,9 @@
-from pathlib import Path
 import sqlite3
+from pathlib import Path
 
 import pandas as pd
-
-from config.settings import RAW_DIR, PROCESSED_DIR
 from config.logging_setup import setup_logger
-
+from config.settings import PROCESSED_DIR, RAW_DIR
 
 INTERVAL = "15s"
 INTERVAL_MS = 15_000
@@ -59,7 +57,10 @@ def build_distribution_for_symbol(
     WITH bucketed AS (
         SELECT
             (trade_time / {INTERVAL_MS}) * {INTERVAL_MS} AS bucket_time,
-            CAST(price / {PRICE_BUCKET_SIZE} AS INTEGER) * {PRICE_BUCKET_SIZE} AS price_bucket,
+            CAST(
+                price / {PRICE_BUCKET_SIZE}
+                AS INTEGER
+            ) * {PRICE_BUCKET_SIZE} AS price_bucket,
             quantity,
             is_buyer_maker
         FROM trades
@@ -111,7 +112,8 @@ def build_distribution_for_symbol(
     df.to_parquet(output_path, index=False)
 
     logger.info(
-        "Saved price distribution interval=%s symbol=%s date=%s rows=%d start=%s end=%s output=%s",
+        "Saved price distribution interval=%s symbol=%s date=%s "
+        "rows=%d start=%s end=%s output=%s",
         INTERVAL,
         symbol,
         date_part,
@@ -161,7 +163,8 @@ def build_distributions_for_file(raw_db_path: Path) -> None:
 
             if output_path.exists():
                 logger.info(
-                    "Skipping existing price distribution interval=%s symbol=%s date=%s output=%s",
+                    "Skipping existing price distribution interval=%s "
+                    "symbol=%s date=%s output=%s",
                     INTERVAL,
                     symbol,
                     date_part,
@@ -179,7 +182,8 @@ def build_distributions_for_file(raw_db_path: Path) -> None:
 
 def main() -> None:
     logger.info(
-        "Starting price distribution pipeline raw_dir=%s processed_dir=%s interval=%s price_bucket_size=%s",
+        "Starting price distribution pipeline raw_dir=%s "
+        "processed_dir=%s interval=%s price_bucket_size=%s",
         RAW_DIR,
         PROCESSED_DIR,
         INTERVAL,

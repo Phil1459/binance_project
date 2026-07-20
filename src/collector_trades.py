@@ -1,26 +1,25 @@
 import asyncio
 import json
 import time
+
 import websockets
-
-from config.settings import SYMBOLS, RAW_DIR
 from config.logging_setup import setup_logger
-from src.db import connect_db, insert_trades, daily_database_path
+from config.settings import RAW_DIR, SYMBOLS
+from src.db import connect_db, daily_database_path, insert_trades
 
-#Code saves the trades into the db after BATCH_SIZE-trades or FLUSH_INTERVAL_SECONDS-seconds
+# Code saves the trades into the db after
+# BATCH_SIZE-trades or FLUSH_INTERVAL_SECONDS-seconds
 BATCH_SIZE = 250
-FLUSH_INTERVAL_SECONDS = 1.0 #Saves the trades every second
+FLUSH_INTERVAL_SECONDS = 1.0  # Saves the trades every second
 
 logger = setup_logger(
     name="trade_collector",
     log_file="logs/trade_collector.log",
 )
 
+
 def trade_stream_url(symbols: list[str]) -> str:
-    streams = "/".join(
-        f"{symbol.lower()}@trade"
-        for symbol in symbols
-    )
+    streams = "/".join(f"{symbol.lower()}@trade" for symbol in symbols)
     return f"wss://stream.binance.com:9443/stream?streams={streams}"
 
 
@@ -32,7 +31,7 @@ async def collect_trades() -> None:
 
     buffer: list[dict] = []
     last_flush = time.monotonic()
-    
+
     total_received = 0
     total_flushed = 0
 
@@ -54,7 +53,7 @@ async def collect_trades() -> None:
 
                     async for message in websocket:
                         raw_msg = json.loads(message)
-                        
+
                         # Combined streams wrap the trade payload in "data"
                         msg = raw_msg["data"]
 

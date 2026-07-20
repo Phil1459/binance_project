@@ -1,11 +1,13 @@
-import sqlite3
 import json
+import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, UTC
+
 
 def daily_database_path(database_dir: str) -> str:
     date_str = datetime.now(UTC).strftime("%Y_%m_%d")
     return str(Path(database_dir) / f"trades_{date_str}.sqlite")
+
 
 def connect_db(database_path: str) -> sqlite3.Connection:
     Path(database_path).parent.mkdir(parents=True, exist_ok=True)
@@ -16,18 +18,18 @@ def connect_db(database_path: str) -> sqlite3.Connection:
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.execute("PRAGMA temp_store=MEMORY;")
     conn.execute("PRAGMA busy_timeout=30000;")
-    conn.execute("""                      
+    conn.execute("""
                 CREATE TABLE IF NOT EXISTS trades (
 
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            
+
                     event_type TEXT NOT NULL,
                     event_time INTEGER NOT NULL,
-                    trade_time INTEGER NOT NULL,            
+                    trade_time INTEGER NOT NULL,
 
                     exchange_trade_id INTEGER NOT NULL,
 
-                    
+
                     symbol TEXT NOT NULL,
 
                     price REAL NOT NULL,
@@ -36,7 +38,7 @@ def connect_db(database_path: str) -> sqlite3.Connection:
                     is_buyer_maker INTEGER NOT NULL,
 
                     raw_json TEXT NOT NULL,
-                                
+
                     UNIQUE(symbol, exchange_trade_id)
                 );
     """)
@@ -49,6 +51,7 @@ def connect_db(database_path: str) -> sqlite3.Connection:
     conn.commit()
 
     return conn
+
 
 def insert_trades(conn: sqlite3.Connection, messages: list[dict]) -> None:
     rows = [
@@ -66,7 +69,8 @@ def insert_trades(conn: sqlite3.Connection, messages: list[dict]) -> None:
         for msg in messages
     ]
 
-    conn.executemany("""
+    conn.executemany(
+        """
         INSERT OR IGNORE INTO trades (
             event_type,
             event_time,
@@ -79,6 +83,8 @@ def insert_trades(conn: sqlite3.Connection, messages: list[dict]) -> None:
             raw_json
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, rows)
+    """,
+        rows,
+    )
 
     conn.commit()
