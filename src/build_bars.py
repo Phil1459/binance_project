@@ -1,11 +1,9 @@
-from pathlib import Path
 import sqlite3
+from pathlib import Path
 
 import pandas as pd
-
-from config.settings import RAW_DIR, PROCESSED_DIR
 from config.logging_setup import setup_logger
-
+from config.settings import PROCESSED_DIR, RAW_DIR
 
 BAR_INTERVAL = "15s"
 BAR_INTERVAL_MS = 15_000
@@ -182,16 +180,15 @@ def build_bars_for_file(raw_db_path: Path) -> None:
     )
 
     with sqlite3.connect(raw_db_path) as conn:
-
         logger.debug(
             "Opened database path=%s",
             raw_db_path,
         )
 
-        #To reduce runtime
+        # To reduce runtime
         conn.execute("PRAGMA temp_store=MEMORY;")
         conn.execute("PRAGMA cache_size=-200000;")
-        
+
         symbols = get_symbols(conn)
 
         if not symbols:
