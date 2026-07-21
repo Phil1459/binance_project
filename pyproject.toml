@@ -12,7 +12,12 @@ select = [
     "B",
 ]
 
-ignore = []
+ignore = [
+    "E111",
+    "E114",
+    "E117",
+    "W191",
+]
 
 [tool.ruff.format]
 quote-style = "double"
