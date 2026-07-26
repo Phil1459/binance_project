@@ -1,3 +1,11 @@
+# Build 15-second OHLCV bars from raw trade databases.
+"""
+Provide the bar build pipeline.
+
+This module reads raw SQLite trade files and writes per-symbol 15-second bar
+Parquet files.
+"""
+
 import sqlite3
 from pathlib import Path
 
@@ -16,10 +24,28 @@ logger = setup_logger(
 
 
 def extract_date_part(raw_db_path: Path) -> str:
+    """
+    Extract the date part from a raw trade database path.
+
+    Parameters:
+        raw_db_path (Path): Raw SQLite database path.
+
+    Returns:
+        str: Date part from the database filename.
+    """
     return raw_db_path.stem.replace("trades_", "")
 
 
 def get_symbols(conn: sqlite3.Connection) -> list[str]:
+    """
+    Return all symbols contained in a raw trade database.
+
+    Parameters:
+        conn (sqlite3.Connection): Open SQLite database connection.
+
+    Returns:
+        list[str]: Sorted list of symbols.
+    """
     rows = conn.execute("""
         SELECT DISTINCT symbol
         FROM trades
@@ -30,6 +56,16 @@ def get_symbols(conn: sqlite3.Connection) -> list[str]:
 
 
 def output_path_for(symbol: str, date_part: str) -> Path:
+    """
+    Return the output path for one symbol and date.
+
+    Parameters:
+        symbol (str): Trading pair symbol.
+        date_part (str): Date part from the raw database filename.
+
+    Returns:
+        Path: Target Parquet output path.
+    """
     return (
         PROCESSED_DIR
         / f"bars_{BAR_INTERVAL}"
@@ -44,6 +80,15 @@ def build_bars_for_symbol(
     date_part: str,
     output_path: Path,
 ) -> None:
+    """
+    Build and save bars for one symbol from a raw database.
+
+    Parameters:
+        conn (sqlite3.Connection): Open SQLite database connection.
+        symbol (str): Trading pair symbol.
+        date_part (str): Date part from the raw database filename.
+        output_path (Path): Target Parquet output path.
+    """
     logger.info(
         "Building bars interval=%s symbol=%s date=%s output=%s",
         BAR_INTERVAL,
@@ -171,6 +216,12 @@ def build_bars_for_symbol(
 
 
 def build_bars_for_file(raw_db_path: Path) -> None:
+    """
+    Build bars for every symbol in one raw database file.
+
+    Parameters:
+        raw_db_path (Path): Raw SQLite database path.
+    """
     date_part = extract_date_part(raw_db_path)
 
     logger.info(
@@ -227,6 +278,9 @@ def build_bars_for_file(raw_db_path: Path) -> None:
 
 
 def main() -> None:
+    """
+    Run the bar build pipeline for all raw databases.
+    """
     logger.info(
         "Starting bar build pipeline raw_dir=%s processed_dir=%s interval=%s",
         RAW_DIR,
