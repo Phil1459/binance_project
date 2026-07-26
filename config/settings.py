@@ -30,6 +30,8 @@ BINANCE_API_KEY_TESTNET = os.getenv("BINANCE_API_KEY_TESTNET")
 BINANCE_API_SECRET_TESTNET = os.getenv("BINANCE_API_SECRET_TESTNET")
 
 BINANCE_TESTNET = get_bool_env("BINANCE_TESTNET")
+ENABLE_TRADING = get_bool_env("ENABLE_TRADING")
+
 
 SYMBOLS = [
     symbol.strip().upper()
@@ -39,8 +41,5 @@ SYMBOLS = [
 
 RAW_DIR = Path(os.getenv("RAW_DIR", "data/raw"))
 PROCESSED_DIR = Path(os.getenv("PROCESSED_DIR", "data/processed"))
-
-
-ENABLE_TRADING = os.getenv("ENABLE_TRADING") == "true"
 
 TRADE_SIZE_USDT = float(os.getenv("TRADE_SIZE_USDT", float(25)))

@@ -30,7 +30,7 @@ class BaseClientRest:
         path: str,
         params: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
+    ) -> Any:
         url = f"{self.base_url}{path}"
 
         logger.debug(
@@ -76,8 +76,10 @@ class BaseClientRest:
         method: str,
         path: str,
         params: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+    ) -> Any:
         self._require_credentials()
+
+        assert self.api_key is not None
 
         signed_params = dict(params or {})
 
@@ -102,6 +104,8 @@ class BaseClientRest:
 
     def _sign(self, query_string: str) -> str:
         self._require_credentials()
+
+        assert self.api_secret is not None
 
         return hmac.new(
             self.api_secret.encode("utf-8"),
