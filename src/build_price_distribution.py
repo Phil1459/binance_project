@@ -1,3 +1,11 @@
+# Build 15-second price distributions from raw trade databases.
+"""
+Provide the price distribution build pipeline.
+
+This module reads raw SQLite trade files and writes per-symbol 15-second price
+distribution Parquet files.
+"""
+
 import sqlite3
 from pathlib import Path
 
@@ -17,10 +25,28 @@ logger = setup_logger(
 
 
 def extract_date_part(raw_db_path: Path) -> str:
+    """
+    Extract the date part from a raw trade database path.
+
+    Parameters:
+        raw_db_path (Path): Raw SQLite database path.
+
+    Returns:
+        str: Date part from the database filename.
+    """
     return raw_db_path.stem.replace("trades_", "")
 
 
 def get_symbols(conn: sqlite3.Connection) -> list[str]:
+    """
+    Return all symbols contained in a raw trade database.
+
+    Parameters:
+        conn (sqlite3.Connection): Open SQLite database connection.
+
+    Returns:
+        list[str]: Sorted list of symbols.
+    """
     rows = conn.execute("""
         SELECT DISTINCT symbol
         FROM trades
@@ -31,6 +57,16 @@ def get_symbols(conn: sqlite3.Connection) -> list[str]:
 
 
 def output_path_for(symbol: str, date_part: str) -> Path:
+    """
+    Return the output path for one symbol and date.
+
+    Parameters:
+        symbol (str): Trading pair symbol.
+        date_part (str): Date part from the raw database filename.
+
+    Returns:
+        Path: Target Parquet output path.
+    """
     return (
         PROCESSED_DIR
         / f"price_distribution_{INTERVAL}"
@@ -45,6 +81,15 @@ def build_distribution_for_symbol(
     date_part: str,
     output_path: Path,
 ) -> None:
+    """
+    Build and save a price distribution for one symbol.
+
+    Parameters:
+        conn (sqlite3.Connection): Open SQLite database connection.
+        symbol (str): Trading pair symbol.
+        date_part (str): Date part from the raw database filename.
+        output_path (Path): Target Parquet output path.
+    """
     logger.info(
         "Building price distribution interval=%s symbol=%s date=%s output=%s",
         INTERVAL,
@@ -125,6 +170,12 @@ def build_distribution_for_symbol(
 
 
 def build_distributions_for_file(raw_db_path: Path) -> None:
+    """
+    Build price distributions for every symbol in one raw database file.
+
+    Parameters:
+        raw_db_path (Path): Raw SQLite database path.
+    """
     date_part = extract_date_part(raw_db_path)
 
     logger.info(
@@ -181,6 +232,9 @@ def build_distributions_for_file(raw_db_path: Path) -> None:
 
 
 def main() -> None:
+    """
+    Run the price distribution build pipeline for all raw databases.
+    """
     logger.info(
         "Starting price distribution pipeline raw_dir=%s "
         "processed_dir=%s interval=%s price_bucket_size=%s",
