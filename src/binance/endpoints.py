@@ -1,3 +1,11 @@
+# Binance REST endpoint configuration.
+"""
+Provide Binance REST base URLs.
+
+This module contains live and testnet base URLs for Spot and USD-M Futures REST
+clients.
+"""
+
 # Spot APIs
 BASE_URL_SPOT_REST_LIVE = [
     "https://api.binance.com/api",
@@ -16,6 +24,15 @@ BASE_URL_SPOT_REST_TESTNET = [
 
 
 def get_base_url_spot_rest(testnet: bool) -> str:
+    """
+    Return the Binance Spot REST base URL.
+
+    Parameters:
+        testnet (bool): Whether to use the Spot testnet base URL.
+
+    Returns:
+        str: Binance Spot REST base URL.
+    """
     if testnet:
         return BASE_URL_SPOT_REST_TESTNET[0]
 
@@ -33,6 +50,15 @@ USD_M_FUTURES_REST_TESTNET_BASE_URLS = [
 
 
 def get_base_url_usd_m_futures_rest(testnet: bool) -> str:
+    """
+    Return the Binance USD-M Futures REST base URL.
+
+    Parameters:
+        testnet (bool): Whether to use the USD-M Futures testnet base URL.
+
+    Returns:
+        str: Binance USD-M Futures REST base URL.
+    """
     if testnet:
         return USD_M_FUTURES_REST_TESTNET_BASE_URLS[0]
 

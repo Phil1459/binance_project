@@ -1,3 +1,11 @@
+# Binance Spot REST client implementation.
+"""
+Provide Binance Spot REST client functionality.
+
+This module contains public, account, order, order-list, cancellation, and trade
+methods for Binance Spot.
+"""
+
 import logging
 from typing import Any
 
@@ -23,6 +31,18 @@ logger = logging.getLogger(__name__)
 
 
 class SpotClient(BaseClientRest):
+    """
+    A client for Binance Spot REST endpoints.
+
+    Attributes:
+        testnet (bool): Whether the client uses the Binance Spot testnet.
+        base_url (str): Binance Spot REST base URL.
+        timeout_seconds (int): HTTP request timeout in seconds.
+        api_key (str | None): Binance API key for signed requests.
+        api_secret (str | None): Binance API secret for signed requests.
+        session (requests.Session): HTTP session used for REST requests.
+    """
+
     def __init__(
         self,
         testnet: bool | None = None,
@@ -30,6 +50,15 @@ class SpotClient(BaseClientRest):
         api_secret: str | None = None,
         timeout_seconds: int = 10,
     ) -> None:
+        """
+        Initialize a Binance Spot REST client.
+
+        Parameters:
+            testnet (bool | None): Whether to use the Binance Spot testnet.
+            api_key (str | None): Binance API key for signed requests.
+            api_secret (str | None): Binance API secret for signed requests.
+            timeout_seconds (int): HTTP request timeout in seconds.
+        """
         if testnet is None:
             testnet = BINANCE_TESTNET
 
@@ -67,6 +96,16 @@ class SpotClient(BaseClientRest):
         params: dict[str, Any],
         client_order_id: str | None,
     ) -> dict[str, Any]:
+        """
+        Add a Binance client order ID if provided.
+
+        Parameters:
+            params (dict[str, Any]): Binance order parameters.
+            client_order_id (str | None): Client-defined order ID.
+
+        Returns:
+            dict[str, Any]: Order parameters with optional client order ID.
+        """
         if client_order_id is not None:
             params["newClientOrderId"] = normalize_client_order_id(client_order_id)
 
@@ -77,6 +116,16 @@ class SpotClient(BaseClientRest):
         params: dict[str, Any],
         iceberg_qty: str | None,
     ) -> dict[str, Any]:
+        """
+        Add an iceberg quantity if provided.
+
+        Parameters:
+            params (dict[str, Any]): Binance order parameters.
+            iceberg_qty (str | None): Visible iceberg order quantity.
+
+        Returns:
+            dict[str, Any]: Order parameters with optional iceberg quantity.
+        """
         if iceberg_qty is not None:
             params["icebergQty"] = iceberg_qty
 
@@ -88,6 +137,17 @@ class SpotClient(BaseClientRest):
         stop_price: str | None,
         trailing_delta: int | None,
     ) -> dict[str, Any]:
+        """
+        Add stop trigger parameters to an order.
+
+        Parameters:
+            params (dict[str, Any]): Binance order parameters.
+            stop_price (str | None): Stop trigger price.
+            trailing_delta (int | None): Trailing stop delta.
+
+        Returns:
+            dict[str, Any]: Order parameters with stop trigger fields.
+        """
         if stop_price is None and trailing_delta is None:
             raise ValueError("Either stop_price or trailing_delta is required")
 
@@ -104,10 +164,23 @@ class SpotClient(BaseClientRest):
         quantity: str | None,
         quote_order_qty: str | None,
     ) -> None:
+        """
+        Validate that exactly one market quantity type is provided.
+
+        Parameters:
+            quantity (str | None): Base asset quantity.
+            quote_order_qty (str | None): Quote asset order quantity.
+        """
         if (quantity is None) == (quote_order_qty is None):
             raise ValueError("Exactly one of quantity or quote_order_qty is required")
 
     def ping(self) -> bool:
+        """
+        Check whether the Binance Spot REST API is reachable.
+
+        Returns:
+            bool: True if the ping request succeeds.
+        """
         self._request(
             method="GET",
             path="/v3/ping",
@@ -118,6 +191,12 @@ class SpotClient(BaseClientRest):
         return True
 
     def get_server_time(self) -> int:
+        """
+        Return the Binance Spot server time.
+
+        Returns:
+            int: Binance server time in milliseconds.
+        """
         data = self._request(
             method="GET",
             path="/v3/time",
@@ -136,6 +215,12 @@ class SpotClient(BaseClientRest):
         return server_time
 
     def get_account_info(self) -> dict[str, Any]:
+        """
+        Return Binance Spot account information.
+
+        Returns:
+            dict[str, Any]: Binance Spot account response.
+        """
         account_info = self._signed_request(
             method="GET",
             path="/v3/account",
@@ -150,6 +235,16 @@ class SpotClient(BaseClientRest):
         params: dict[str, Any],
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place or validate a Binance Spot order.
+
+        Parameters:
+            params (dict[str, Any]): Binance Spot order parameters.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         if not test and not self.testnet and not ENABLE_TRADING:
             raise RuntimeError(
                 "Real trading is disabled. "
@@ -187,6 +282,22 @@ class SpotClient(BaseClientRest):
         client_order_id: str | None = None,
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place a Binance Spot limit order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            side (str): Order side, BUY or SELL.
+            quantity (str): Base asset quantity.
+            price (str): Limit order price.
+            time_in_force (str): Order time-in-force policy.
+            iceberg_qty (str | None): Optional visible iceberg quantity.
+            client_order_id (str | None): Optional client-defined order ID.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         params: dict[str, Any] = {
             "symbol": symbol,
             "side": normalize_order_side(side),
@@ -219,6 +330,20 @@ class SpotClient(BaseClientRest):
         client_order_id: str | None = None,
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place a Binance Spot market order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            side (str): Order side, BUY or SELL.
+            quantity (str | None): Base asset quantity.
+            quote_order_qty (str | None): Quote asset order quantity.
+            client_order_id (str | None): Optional client-defined order ID.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         self._validate_exactly_one_market_quantity(
             quantity=quantity,
             quote_order_qty=quote_order_qty,
@@ -256,6 +381,21 @@ class SpotClient(BaseClientRest):
         client_order_id: str | None = None,
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place a Binance Spot limit maker order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            side (str): Order side, BUY or SELL.
+            quantity (str): Base asset quantity.
+            price (str): Limit maker order price.
+            iceberg_qty (str | None): Optional visible iceberg quantity.
+            client_order_id (str | None): Optional client-defined order ID.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         params: dict[str, Any] = {
             "symbol": symbol,
             "side": normalize_order_side(side),
@@ -288,6 +428,21 @@ class SpotClient(BaseClientRest):
         client_order_id: str | None = None,
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place a Binance Spot stop loss order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            side (str): Order side, BUY or SELL.
+            quantity (str): Base asset quantity.
+            stop_price (str | None): Stop trigger price.
+            trailing_delta (int | None): Trailing stop delta.
+            client_order_id (str | None): Optional client-defined order ID.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         params: dict[str, Any] = {
             "symbol": symbol,
             "side": normalize_order_side(side),
@@ -323,6 +478,24 @@ class SpotClient(BaseClientRest):
         client_order_id: str | None = None,
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place a Binance Spot stop loss limit order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            side (str): Order side, BUY or SELL.
+            quantity (str): Base asset quantity.
+            price (str): Limit order price after trigger.
+            stop_price (str | None): Stop trigger price.
+            trailing_delta (int | None): Trailing stop delta.
+            time_in_force (str): Order time-in-force policy.
+            iceberg_qty (str | None): Optional visible iceberg quantity.
+            client_order_id (str | None): Optional client-defined order ID.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         params: dict[str, Any] = {
             "symbol": symbol,
             "side": normalize_order_side(side),
@@ -361,6 +534,21 @@ class SpotClient(BaseClientRest):
         client_order_id: str | None = None,
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place a Binance Spot take profit order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            side (str): Order side, BUY or SELL.
+            quantity (str): Base asset quantity.
+            stop_price (str | None): Stop trigger price.
+            trailing_delta (int | None): Trailing stop delta.
+            client_order_id (str | None): Optional client-defined order ID.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         params: dict[str, Any] = {
             "symbol": symbol,
             "side": normalize_order_side(side),
@@ -396,6 +584,24 @@ class SpotClient(BaseClientRest):
         client_order_id: str | None = None,
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place a Binance Spot take profit limit order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            side (str): Order side, BUY or SELL.
+            quantity (str): Base asset quantity.
+            price (str): Limit order price after trigger.
+            stop_price (str | None): Stop trigger price.
+            trailing_delta (int | None): Trailing stop delta.
+            time_in_force (str): Order time-in-force policy.
+            iceberg_qty (str | None): Optional visible iceberg quantity.
+            client_order_id (str | None): Optional client-defined order ID.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         params: dict[str, Any] = {
             "symbol": symbol,
             "side": normalize_order_side(side),
@@ -428,6 +634,15 @@ class SpotClient(BaseClientRest):
         self,
         params: dict[str, Any],
     ) -> dict[str, Any]:
+        """
+        Place a Binance Spot OCO order list.
+
+        Parameters:
+            params (dict[str, Any]): Binance OCO order list parameters.
+
+        Returns:
+            dict[str, Any]: Binance order list response.
+        """
         if not self.testnet and not ENABLE_TRADING:
             raise RuntimeError(
                 "Real trading is disabled. "
@@ -454,6 +669,15 @@ class SpotClient(BaseClientRest):
         self,
         params: dict[str, Any],
     ) -> dict[str, Any]:
+        """
+        Place a Binance Spot OTO order list.
+
+        Parameters:
+            params (dict[str, Any]): Binance OTO order list parameters.
+
+        Returns:
+            dict[str, Any]: Binance order list response.
+        """
         if not self.testnet and not ENABLE_TRADING:
             raise RuntimeError(
                 "Real trading is disabled. "
@@ -480,6 +704,15 @@ class SpotClient(BaseClientRest):
         self,
         params: dict[str, Any],
     ) -> dict[str, Any]:
+        """
+        Place a Binance Spot OTOCO order list.
+
+        Parameters:
+            params (dict[str, Any]): Binance OTOCO order list parameters.
+
+        Returns:
+            dict[str, Any]: Binance order list response.
+        """
         if not self.testnet and not ENABLE_TRADING:
             raise RuntimeError(
                 "Real trading is disabled. "
@@ -508,6 +741,17 @@ class SpotClient(BaseClientRest):
         order_id: int | None = None,
         client_order_id: str | None = None,
     ) -> dict[str, Any]:
+        """
+        Return a Binance Spot order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            order_id (int | None): Binance-generated order ID.
+            client_order_id (str | None): Client-defined order ID.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         validate_exactly_one_order_identifier(
             order_id=order_id,
             client_order_id=client_order_id,
@@ -533,6 +777,15 @@ class SpotClient(BaseClientRest):
         self,
         symbol: str | None = None,
     ) -> list[dict[str, Any]]:
+        """
+        Return open Binance Spot orders.
+
+        Parameters:
+            symbol (str | None): Optional trading pair symbol.
+
+        Returns:
+            list[dict[str, Any]]: Open Binance Spot orders.
+        """
         params: dict[str, Any] = {}
 
         if symbol is not None:
@@ -552,6 +805,19 @@ class SpotClient(BaseClientRest):
         start_time: int | None = None,
         end_time: int | None = None,
     ) -> list[dict[str, Any]]:
+        """
+        Return Binance Spot orders for a symbol.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            limit (int): Maximum number of orders to return.
+            order_id (int | None): Optional starting Binance order ID.
+            start_time (int | None): Optional start time in milliseconds.
+            end_time (int | None): Optional end time in milliseconds.
+
+        Returns:
+            list[dict[str, Any]]: Binance Spot order entries.
+        """
         params: dict[str, Any] = {
             "symbol": normalize_symbol(symbol),
             "limit": limit,
@@ -578,6 +844,17 @@ class SpotClient(BaseClientRest):
         order_id: int | None = None,
         client_order_id: str | None = None,
     ) -> dict[str, Any]:
+        """
+        Cancel a Binance Spot order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            order_id (int | None): Binance-generated order ID.
+            client_order_id (str | None): Client-defined order ID.
+
+        Returns:
+            dict[str, Any]: Binance cancellation response.
+        """
         validate_exactly_one_order_identifier(
             order_id=order_id,
             client_order_id=client_order_id,
@@ -612,6 +889,15 @@ class SpotClient(BaseClientRest):
         self,
         symbol: str,
     ) -> list[dict[str, Any]]:
+        """
+        Cancel all open Binance Spot orders for a symbol.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+
+        Returns:
+            list[dict[str, Any]]: Binance cancellation responses.
+        """
         params: dict[str, Any] = {
             "symbol": normalize_symbol(symbol),
         }
@@ -637,6 +923,19 @@ class SpotClient(BaseClientRest):
         start_time: int | None = None,
         end_time: int | None = None,
     ) -> list[dict[str, Any]]:
+        """
+        Return Binance Spot account trades for a symbol.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            limit (int): Maximum number of trades to return.
+            from_id (int | None): Optional starting trade ID.
+            start_time (int | None): Optional start time in milliseconds.
+            end_time (int | None): Optional end time in milliseconds.
+
+        Returns:
+            list[dict[str, Any]]: Binance Spot trade entries.
+        """
         params: dict[str, Any] = {
             "symbol": normalize_symbol(symbol),
             "limit": limit,

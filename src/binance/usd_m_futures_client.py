@@ -1,3 +1,11 @@
+# Binance USD-M Futures REST client implementation.
+"""
+Provide Binance USD-M Futures REST client functionality.
+
+This module contains public, account, position, order, cancellation, and trade
+methods for Binance USD-M Futures.
+"""
+
 import logging
 from typing import Any
 
@@ -23,6 +31,18 @@ logger = logging.getLogger(__name__)
 
 
 class UsdMFuturesClient(BaseClientRest):
+    """
+    A client for Binance USD-M Futures REST endpoints.
+
+    Attributes:
+        testnet (bool): Whether the client uses the Binance Futures testnet.
+        base_url (str): Binance USD-M Futures REST base URL.
+        timeout_seconds (int): HTTP request timeout in seconds.
+        api_key (str | None): Binance API key for signed requests.
+        api_secret (str | None): Binance API secret for signed requests.
+        session (requests.Session): HTTP session used for REST requests.
+    """
+
     def __init__(
         self,
         testnet: bool | None = None,
@@ -30,6 +50,15 @@ class UsdMFuturesClient(BaseClientRest):
         api_secret: str | None = None,
         timeout_seconds: int = 10,
     ) -> None:
+        """
+        Initialize a Binance USD-M Futures REST client.
+
+        Parameters:
+            testnet (bool | None): Whether to use the Binance Futures testnet.
+            api_key (str | None): Binance API key for signed requests.
+            api_secret (str | None): Binance API secret for signed requests.
+            timeout_seconds (int): HTTP request timeout in seconds.
+        """
         if testnet is None:
             testnet = BINANCE_TESTNET
 
@@ -67,6 +96,16 @@ class UsdMFuturesClient(BaseClientRest):
         params: dict[str, Any],
         client_order_id: str | None,
     ) -> dict[str, Any]:
+        """
+        Add a Binance client order ID if provided.
+
+        Parameters:
+            params (dict[str, Any]): Binance order parameters.
+            client_order_id (str | None): Client-defined order ID.
+
+        Returns:
+            dict[str, Any]: Order parameters with optional client order ID.
+        """
         if client_order_id is not None:
             params["newClientOrderId"] = normalize_client_order_id(client_order_id)
 
@@ -78,6 +117,17 @@ class UsdMFuturesClient(BaseClientRest):
         name: str,
         value: bool | None,
     ) -> dict[str, Any]:
+        """
+        Add a Binance-compatible boolean parameter if provided.
+
+        Parameters:
+            params (dict[str, Any]): Binance request parameters.
+            name (str): Binance parameter name.
+            value (bool | None): Optional boolean value.
+
+        Returns:
+            dict[str, Any]: Parameters with optional boolean field.
+        """
         if value is not None:
             params[name] = "true" if value else "false"
 
@@ -89,6 +139,17 @@ class UsdMFuturesClient(BaseClientRest):
         name: str,
         value: Any,
     ) -> dict[str, Any]:
+        """
+        Add an optional Binance parameter if provided.
+
+        Parameters:
+            params (dict[str, Any]): Binance request parameters.
+            name (str): Binance parameter name.
+            value (Any): Optional parameter value.
+
+        Returns:
+            dict[str, Any]: Parameters with optional field.
+        """
         if value is not None:
             params[name] = value
 
@@ -99,6 +160,16 @@ class UsdMFuturesClient(BaseClientRest):
         params: dict[str, Any],
         position_side: str | None,
     ) -> dict[str, Any]:
+        """
+        Add a normalized Futures position side if provided.
+
+        Parameters:
+            params (dict[str, Any]): Binance order parameters.
+            position_side (str | None): Position side, BOTH, LONG, or SHORT.
+
+        Returns:
+            dict[str, Any]: Order parameters with optional position side.
+        """
         if position_side is None:
             return params
 
@@ -116,6 +187,16 @@ class UsdMFuturesClient(BaseClientRest):
         params: dict[str, Any],
         working_type: str | None,
     ) -> dict[str, Any]:
+        """
+        Add a normalized Futures working type if provided.
+
+        Parameters:
+            params (dict[str, Any]): Binance order parameters.
+            working_type (str | None): Trigger price type.
+
+        Returns:
+            dict[str, Any]: Order parameters with optional working type.
+        """
         if working_type is None:
             return params
 
@@ -133,6 +214,16 @@ class UsdMFuturesClient(BaseClientRest):
         params: dict[str, Any],
         new_order_resp_type: str | None,
     ) -> dict[str, Any]:
+        """
+        Add a normalized order response type if provided.
+
+        Parameters:
+            params (dict[str, Any]): Binance order parameters.
+            new_order_resp_type (str | None): Response type, ACK or RESULT.
+
+        Returns:
+            dict[str, Any]: Order parameters with optional response type.
+        """
         if new_order_resp_type is None:
             return params
 
@@ -155,6 +246,21 @@ class UsdMFuturesClient(BaseClientRest):
         price_protect: bool | None = None,
         new_order_resp_type: str | None = None,
     ) -> dict[str, Any]:
+        """
+        Add shared USD-M Futures order parameters.
+
+        Parameters:
+            params (dict[str, Any]): Binance order parameters.
+            position_side (str | None): Optional Futures position side.
+            reduce_only (bool | None): Optional reduce-only flag.
+            client_order_id (str | None): Optional client-defined order ID.
+            working_type (str | None): Optional trigger price type.
+            price_protect (bool | None): Optional price protection flag.
+            new_order_resp_type (str | None): Optional order response type.
+
+        Returns:
+            dict[str, Any]: Order parameters with optional shared fields.
+        """
         params = self._add_position_side(
             params=params,
             position_side=position_side,
@@ -188,6 +294,15 @@ class UsdMFuturesClient(BaseClientRest):
         self,
         params: dict[str, Any],
     ) -> dict[str, Any]:
+        """
+        Return normalized USD-M Futures order parameters.
+
+        Parameters:
+            params (dict[str, Any]): Binance order parameters.
+
+        Returns:
+            dict[str, Any]: Normalized Binance order parameters.
+        """
         normalized_params = normalize_order_params_symbol(params)
 
         side = normalized_params.get("side")
@@ -216,10 +331,23 @@ class UsdMFuturesClient(BaseClientRest):
         quantity: str | None,
         close_position: bool | None,
     ) -> None:
+        """
+        Validate quantity requirements for stop market orders.
+
+        Parameters:
+            quantity (str | None): Optional order quantity.
+            close_position (bool | None): Optional close-position flag.
+        """
         if quantity is None and close_position is not True:
             raise ValueError("quantity is required unless close_position is True")
 
     def ping(self) -> bool:
+        """
+        Check whether the Binance USD-M Futures REST API is reachable.
+
+        Returns:
+            bool: True if the ping request succeeds.
+        """
         self._request(
             method="GET",
             path="/v1/ping",
@@ -230,6 +358,12 @@ class UsdMFuturesClient(BaseClientRest):
         return True
 
     def get_server_time(self) -> int:
+        """
+        Return the Binance USD-M Futures server time.
+
+        Returns:
+            int: Binance server time in milliseconds.
+        """
         data = self._request(
             method="GET",
             path="/v1/time",
@@ -250,6 +384,12 @@ class UsdMFuturesClient(BaseClientRest):
         return server_time
 
     def get_account_info(self) -> dict[str, Any]:
+        """
+        Return Binance USD-M Futures account information.
+
+        Returns:
+            dict[str, Any]: Binance USD-M Futures account response.
+        """
         account_info = self._signed_request(
             method="GET",
             path="/v3/account",
@@ -260,6 +400,12 @@ class UsdMFuturesClient(BaseClientRest):
         return account_info
 
     def get_account_balance(self) -> list[dict[str, Any]]:
+        """
+        Return Binance USD-M Futures account balances.
+
+        Returns:
+            list[dict[str, Any]]: Futures account balance entries.
+        """
         return self._signed_request(
             method="GET",
             path="/v3/balance",
@@ -269,6 +415,15 @@ class UsdMFuturesClient(BaseClientRest):
         self,
         symbol: str | None = None,
     ) -> list[dict[str, Any]]:
+        """
+        Return Binance USD-M Futures position risk entries.
+
+        Parameters:
+            symbol (str | None): Optional trading pair symbol.
+
+        Returns:
+            list[dict[str, Any]]: Futures position risk entries.
+        """
         params: dict[str, Any] = {}
 
         if symbol is not None:
@@ -281,6 +436,12 @@ class UsdMFuturesClient(BaseClientRest):
         )
 
     def get_position_mode(self) -> dict[str, Any]:
+        """
+        Return Binance USD-M Futures position mode.
+
+        Returns:
+            dict[str, Any]: Futures position mode response.
+        """
         return self._signed_request(
             method="GET",
             path="/v1/positionSide/dual",
@@ -291,6 +452,16 @@ class UsdMFuturesClient(BaseClientRest):
         symbol: str,
         leverage: int,
     ) -> dict[str, Any]:
+        """
+        Change leverage for a Binance USD-M Futures symbol.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            leverage (int): Desired leverage value.
+
+        Returns:
+            dict[str, Any]: Binance leverage change response.
+        """
         params: dict[str, Any] = {
             "symbol": normalize_symbol(symbol),
             "leverage": leverage,
@@ -315,6 +486,16 @@ class UsdMFuturesClient(BaseClientRest):
         symbol: str,
         margin_type: str,
     ) -> dict[str, Any]:
+        """
+        Change margin type for a Binance USD-M Futures symbol.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            margin_type (str): Margin type, ISOLATED or CROSSED.
+
+        Returns:
+            dict[str, Any]: Binance margin type change response.
+        """
         normalized_margin_type = margin_type.strip().upper()
 
         if normalized_margin_type not in {"ISOLATED", "CROSSED"}:
@@ -344,6 +525,16 @@ class UsdMFuturesClient(BaseClientRest):
         params: dict[str, Any],
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place or validate a Binance USD-M Futures order.
+
+        Parameters:
+            params (dict[str, Any]): Binance USD-M Futures order parameters.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         if not test and not self.testnet and not ENABLE_TRADING:
             raise RuntimeError(
                 "Real futures trading is disabled. "
@@ -383,6 +574,24 @@ class UsdMFuturesClient(BaseClientRest):
         new_order_resp_type: str | None = None,
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place a Binance USD-M Futures limit order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            side (str): Order side, BUY or SELL.
+            quantity (str): Contract quantity.
+            price (str): Limit order price.
+            time_in_force (str): Order time-in-force policy.
+            position_side (str | None): Optional Futures position side.
+            reduce_only (bool | None): Optional reduce-only flag.
+            client_order_id (str | None): Optional client-defined order ID.
+            new_order_resp_type (str | None): Optional order response type.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         params: dict[str, Any] = {
             "symbol": symbol,
             "side": side,
@@ -416,6 +625,22 @@ class UsdMFuturesClient(BaseClientRest):
         new_order_resp_type: str | None = None,
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place a Binance USD-M Futures market order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            side (str): Order side, BUY or SELL.
+            quantity (str): Contract quantity.
+            position_side (str | None): Optional Futures position side.
+            reduce_only (bool | None): Optional reduce-only flag.
+            client_order_id (str | None): Optional client-defined order ID.
+            new_order_resp_type (str | None): Optional order response type.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         params: dict[str, Any] = {
             "symbol": symbol,
             "side": side,
@@ -452,6 +677,27 @@ class UsdMFuturesClient(BaseClientRest):
         new_order_resp_type: str | None = None,
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place a Binance USD-M Futures stop order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            side (str): Order side, BUY or SELL.
+            quantity (str): Contract quantity.
+            price (str): Limit order price after trigger.
+            stop_price (str): Stop trigger price.
+            time_in_force (str): Order time-in-force policy.
+            position_side (str | None): Optional Futures position side.
+            reduce_only (bool | None): Optional reduce-only flag.
+            client_order_id (str | None): Optional client-defined order ID.
+            working_type (str | None): Optional trigger price type.
+            price_protect (bool | None): Optional price protection flag.
+            new_order_resp_type (str | None): Optional order response type.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         params: dict[str, Any] = {
             "symbol": symbol,
             "side": side,
@@ -492,6 +738,26 @@ class UsdMFuturesClient(BaseClientRest):
         new_order_resp_type: str | None = None,
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place a Binance USD-M Futures stop market order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            side (str): Order side, BUY or SELL.
+            stop_price (str): Stop trigger price.
+            quantity (str | None): Optional contract quantity.
+            close_position (bool | None): Optional close-position flag.
+            position_side (str | None): Optional Futures position side.
+            reduce_only (bool | None): Optional reduce-only flag.
+            client_order_id (str | None): Optional client-defined order ID.
+            working_type (str | None): Optional trigger price type.
+            price_protect (bool | None): Optional price protection flag.
+            new_order_resp_type (str | None): Optional order response type.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         self._validate_stop_market_quantity(
             quantity=quantity,
             close_position=close_position,
@@ -543,6 +809,27 @@ class UsdMFuturesClient(BaseClientRest):
         new_order_resp_type: str | None = None,
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place a Binance USD-M Futures take profit order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            side (str): Order side, BUY or SELL.
+            quantity (str): Contract quantity.
+            price (str): Limit order price after trigger.
+            stop_price (str): Stop trigger price.
+            time_in_force (str): Order time-in-force policy.
+            position_side (str | None): Optional Futures position side.
+            reduce_only (bool | None): Optional reduce-only flag.
+            client_order_id (str | None): Optional client-defined order ID.
+            working_type (str | None): Optional trigger price type.
+            price_protect (bool | None): Optional price protection flag.
+            new_order_resp_type (str | None): Optional order response type.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         params: dict[str, Any] = {
             "symbol": symbol,
             "side": side,
@@ -583,6 +870,26 @@ class UsdMFuturesClient(BaseClientRest):
         new_order_resp_type: str | None = None,
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place a Binance USD-M Futures take profit market order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            side (str): Order side, BUY or SELL.
+            stop_price (str): Stop trigger price.
+            quantity (str | None): Optional contract quantity.
+            close_position (bool | None): Optional close-position flag.
+            position_side (str | None): Optional Futures position side.
+            reduce_only (bool | None): Optional reduce-only flag.
+            client_order_id (str | None): Optional client-defined order ID.
+            working_type (str | None): Optional trigger price type.
+            price_protect (bool | None): Optional price protection flag.
+            new_order_resp_type (str | None): Optional order response type.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         self._validate_stop_market_quantity(
             quantity=quantity,
             close_position=close_position,
@@ -632,6 +939,25 @@ class UsdMFuturesClient(BaseClientRest):
         new_order_resp_type: str | None = None,
         test: bool = True,
     ) -> dict[str, Any]:
+        """
+        Place a Binance USD-M Futures trailing stop market order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            side (str): Order side, BUY or SELL.
+            callback_rate (str): Trailing stop callback rate.
+            quantity (str | None): Optional contract quantity.
+            activation_price (str | None): Optional activation price.
+            position_side (str | None): Optional Futures position side.
+            reduce_only (bool | None): Optional reduce-only flag.
+            client_order_id (str | None): Optional client-defined order ID.
+            working_type (str | None): Optional trigger price type.
+            new_order_resp_type (str | None): Optional order response type.
+            test (bool): Whether to use the validation-only test endpoint.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         params: dict[str, Any] = {
             "symbol": symbol,
             "side": side,
@@ -667,6 +993,17 @@ class UsdMFuturesClient(BaseClientRest):
         order_id: int | None = None,
         client_order_id: str | None = None,
     ) -> dict[str, Any]:
+        """
+        Return a Binance USD-M Futures order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            order_id (int | None): Binance-generated order ID.
+            client_order_id (str | None): Client-defined order ID.
+
+        Returns:
+            dict[str, Any]: Binance order response.
+        """
         validate_exactly_one_order_identifier(
             order_id=order_id,
             client_order_id=client_order_id,
@@ -692,6 +1029,15 @@ class UsdMFuturesClient(BaseClientRest):
         self,
         symbol: str | None = None,
     ) -> list[dict[str, Any]]:
+        """
+        Return open Binance USD-M Futures orders.
+
+        Parameters:
+            symbol (str | None): Optional trading pair symbol.
+
+        Returns:
+            list[dict[str, Any]]: Open Binance USD-M Futures orders.
+        """
         params: dict[str, Any] = {}
 
         if symbol is not None:
@@ -711,6 +1057,19 @@ class UsdMFuturesClient(BaseClientRest):
         start_time: int | None = None,
         end_time: int | None = None,
     ) -> list[dict[str, Any]]:
+        """
+        Return Binance USD-M Futures orders for a symbol.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            limit (int): Maximum number of orders to return.
+            order_id (int | None): Optional starting Binance order ID.
+            start_time (int | None): Optional start time in milliseconds.
+            end_time (int | None): Optional end time in milliseconds.
+
+        Returns:
+            list[dict[str, Any]]: Binance USD-M Futures order entries.
+        """
         params: dict[str, Any] = {
             "symbol": normalize_symbol(symbol),
             "limit": limit,
@@ -737,6 +1096,17 @@ class UsdMFuturesClient(BaseClientRest):
         order_id: int | None = None,
         client_order_id: str | None = None,
     ) -> dict[str, Any]:
+        """
+        Cancel a Binance USD-M Futures order.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            order_id (int | None): Binance-generated order ID.
+            client_order_id (str | None): Client-defined order ID.
+
+        Returns:
+            dict[str, Any]: Binance cancellation response.
+        """
         validate_exactly_one_order_identifier(
             order_id=order_id,
             client_order_id=client_order_id,
@@ -772,6 +1142,15 @@ class UsdMFuturesClient(BaseClientRest):
         self,
         symbol: str,
     ) -> dict[str, Any]:
+        """
+        Cancel all open Binance USD-M Futures orders for a symbol.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+
+        Returns:
+            dict[str, Any]: Binance cancellation response.
+        """
         params: dict[str, Any] = {
             "symbol": normalize_symbol(symbol),
         }
@@ -797,6 +1176,19 @@ class UsdMFuturesClient(BaseClientRest):
         start_time: int | None = None,
         end_time: int | None = None,
     ) -> list[dict[str, Any]]:
+        """
+        Return Binance USD-M Futures account trades for a symbol.
+
+        Parameters:
+            symbol (str): Trading pair symbol.
+            limit (int): Maximum number of trades to return.
+            from_id (int | None): Optional starting trade ID.
+            start_time (int | None): Optional start time in milliseconds.
+            end_time (int | None): Optional end time in milliseconds.
+
+        Returns:
+            list[dict[str, Any]]: Binance USD-M Futures trade entries.
+        """
         params: dict[str, Any] = {
             "symbol": normalize_symbol(symbol),
             "limit": limit,

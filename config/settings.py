@@ -1,3 +1,11 @@
+# Project settings loaded from environment variables.
+"""
+Provide project-wide configuration values.
+
+This module loads environment variables and exposes Binance, trading, symbol,
+and data path settings.
+"""
+
 import os
 from pathlib import Path
 
@@ -7,6 +15,15 @@ load_dotenv()
 
 
 def get_bool_env(name: str) -> bool:
+    """
+    Return a required boolean environment variable.
+
+    Parameters:
+        name (str): Environment variable name.
+
+    Returns:
+        bool: Parsed boolean value.
+    """
     value = os.getenv(name)
 
     if value is None:

@@ -1,3 +1,11 @@
+# Unit tests for the shared Binance REST base client.
+"""
+Provide tests for the Binance REST base client.
+
+This module tests request handling, response parsing, HTTP errors, transport
+errors, HMAC signing, signed requests, and credential validation.
+"""
+
 from typing import Any
 
 import pytest
@@ -7,32 +15,75 @@ from src.binance.base_client import BaseClientRest
 
 # Minimal fake HTTP response.
 class FakeResponse:
+    """
+    A fake HTTP response for testing REST client behavior.
+
+    Attributes:
+        status_code (int): Fake HTTP status code.
+        text (str): Fake response body text.
+        payload (Any): Fake JSON payload.
+        raise_for_status_called (bool): Whether raise_for_status was called.
+    """
+
     def __init__(
         self,
         status_code: int = 200,
         text: str = "{}",
         payload: Any = None,
     ) -> None:
+        """
+        Initialize a fake HTTP response.
+
+        Parameters:
+            status_code (int): Fake HTTP status code.
+            text (str): Fake response body text.
+            payload (Any): Fake JSON payload.
+        """
         self.status_code = status_code
         self.text = text
         self.payload = payload if payload is not None else {}
         self.raise_for_status_called = False
 
     def json(self) -> Any:
+        """
+        Return the fake JSON payload.
+
+        Returns:
+            Any: Fake JSON payload.
+        """
         return self.payload
 
     def raise_for_status(self) -> None:
+        """
+        Simulate raising an HTTP error.
+        """
         self.raise_for_status_called = True
         raise RuntimeError("Fake HTTP error")
 
 
 # Minimal fake requests session.
 class FakeSession:
+    """
+    A fake requests session for testing REST client requests.
+
+    Attributes:
+        response (FakeResponse | None): Fake response to return.
+        exception (requests.RequestException | None): Fake exception to raise.
+        last_request (dict[str, Any] | None): Last captured request arguments.
+    """
+
     def __init__(
         self,
         response: FakeResponse | None = None,
         exception: requests.RequestException | None = None,
     ) -> None:
+        """
+        Initialize a fake requests session.
+
+        Parameters:
+            response (FakeResponse | None): Fake response to return.
+            exception (requests.RequestException | None): Fake exception to raise.
+        """
         self.response = response
         self.exception = exception
         self.last_request: dict[str, Any] | None = None
@@ -45,6 +96,19 @@ class FakeSession:
         headers: dict[str, str] | None = None,
         timeout: int | None = None,
     ) -> FakeResponse:
+        """
+        Capture and return a fake HTTP request.
+
+        Parameters:
+            method (str): HTTP request method.
+            url (str): Request URL.
+            params (dict[str, Any] | None): Query parameters.
+            headers (dict[str, str] | None): HTTP headers.
+            timeout (int | None): Request timeout in seconds.
+
+        Returns:
+            FakeResponse: Fake HTTP response.
+        """
         self.last_request = {
             "method": method,
             "url": url,
@@ -63,6 +127,12 @@ class FakeSession:
 
 
 def create_base_client() -> BaseClientRest:
+    """
+    Create a Binance REST base client for tests.
+
+    Returns:
+        BaseClientRest: Configured test client.
+    """
     return BaseClientRest(
         base_url="https://api.binance.com/api/",
         timeout_seconds=7,
@@ -72,6 +142,9 @@ def create_base_client() -> BaseClientRest:
 
 
 def test_base_client_strips_trailing_slash() -> None:
+    """
+    Test that the base client strips trailing slashes from the base URL.
+    """
     client = create_base_client()
 
     assert client.base_url == "https://api.binance.com/api"
@@ -81,6 +154,9 @@ def test_base_client_strips_trailing_slash() -> None:
 
 
 def test_base_client_request_returns_json_dict() -> None:
+    """
+    Test that unsigned requests return JSON dictionaries.
+    """
     client = create_base_client()
 
     fake_session = FakeSession(
@@ -109,6 +185,9 @@ def test_base_client_request_returns_json_dict() -> None:
 
 
 def test_base_client_request_returns_json_list() -> None:
+    """
+    Test that unsigned requests return JSON lists.
+    """
     client = create_base_client()
 
     fake_session = FakeSession(
@@ -130,6 +209,9 @@ def test_base_client_request_returns_json_list() -> None:
 
 
 def test_base_client_request_returns_empty_dict_for_empty_body() -> None:
+    """
+    Test that empty response bodies return an empty dictionary.
+    """
     client = create_base_client()
 
     fake_session = FakeSession(
@@ -151,6 +233,9 @@ def test_base_client_request_returns_empty_dict_for_empty_body() -> None:
 
 
 def test_base_client_request_raises_for_http_error() -> None:
+    """
+    Test that HTTP errors call raise_for_status.
+    """
     client = create_base_client()
 
     response = FakeResponse(
@@ -172,6 +257,9 @@ def test_base_client_request_raises_for_http_error() -> None:
 
 
 def test_base_client_request_reraises_request_exception() -> None:
+    """
+    Test that transport exceptions are reraised.
+    """
     client = create_base_client()
 
     fake_session = FakeSession(
@@ -192,6 +280,9 @@ def test_base_client_request_reraises_request_exception() -> None:
 
 
 def test_base_client_sign_returns_expected_hmac() -> None:
+    """
+    Test that HMAC signing returns the expected signature.
+    """
     client = create_base_client()
 
     signature = client._sign(query_string="symbol=BTCUSDT&timestamp=1700000000000")
@@ -204,6 +295,9 @@ def test_base_client_sign_returns_expected_hmac() -> None:
 def test_base_client_signed_request_adds_authentication_params(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """
+    Test that signed requests add authentication parameters.
+    """
     monkeypatch.setattr(
         "src.binance.base_client.time.time",
         lambda: 1_700_000_000.0,
@@ -247,6 +341,9 @@ def test_base_client_signed_request_adds_authentication_params(
 
 
 def test_base_client_signed_request_requires_api_key() -> None:
+    """
+    Test that signed requests require an API key.
+    """
     client = BaseClientRest(
         base_url="https://api.binance.com/api",
         api_key=None,
@@ -261,6 +358,9 @@ def test_base_client_signed_request_requires_api_key() -> None:
 
 
 def test_base_client_signed_request_requires_api_secret() -> None:
+    """
+    Test that signed requests require an API secret.
+    """
     client = BaseClientRest(
         base_url="https://api.binance.com/api",
         api_key="fake_key",
@@ -275,6 +375,9 @@ def test_base_client_signed_request_requires_api_secret() -> None:
 
 
 def test_base_client_sign_requires_credentials() -> None:
+    """
+    Test that signing requires API credentials.
+    """
     client = BaseClientRest(
         base_url="https://api.binance.com/api",
         api_key="fake_key",

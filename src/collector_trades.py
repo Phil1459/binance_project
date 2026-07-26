@@ -1,3 +1,11 @@
+# Collect Binance trade stream data into daily SQLite databases.
+"""
+Provide the live trade collector.
+
+This module connects to Binance trade WebSocket streams and stores incoming
+trades in daily raw SQLite database files.
+"""
+
 import asyncio
 import json
 import time
@@ -19,11 +27,23 @@ logger = setup_logger(
 
 
 def trade_stream_url(symbols: list[str]) -> str:
+    """
+    Build a Binance combined trade stream URL.
+
+    Parameters:
+        symbols (list[str]): Trading pair symbols.
+
+    Returns:
+        str: Binance combined WebSocket trade stream URL.
+    """
     streams = "/".join(f"{symbol.lower()}@trade" for symbol in symbols)
     return f"wss://stream.binance.com:9443/stream?streams={streams}"
 
 
 async def collect_trades() -> None:
+    """
+    Collect Binance trades and store them in daily SQLite databases.
+    """
     url = trade_stream_url(SYMBOLS)
 
     current_db_path = daily_database_path(RAW_DIR)

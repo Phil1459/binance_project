@@ -1,3 +1,11 @@
+# Unit tests for the Binance USD-M Futures REST client.
+"""
+Provide tests for the Binance USD-M Futures REST client.
+
+This module tests public endpoints, signed account requests, position requests,
+order placement, order queries, cancellations, and account trade queries.
+"""
+
 from typing import Any
 
 import pytest
@@ -6,26 +14,66 @@ from src.binance.usd_m_futures_client import UsdMFuturesClient
 
 # Minimal fake HTTP response.
 class FakeResponse:
+    """
+    A fake HTTP response for testing USD-M Futures client behavior.
+
+    Attributes:
+        status_code (int): Fake HTTP status code.
+        text (str): Fake response body text.
+        payload (Any): Fake JSON payload.
+    """
+
     def __init__(
         self,
         status_code: int = 200,
         text: str = "{}",
         payload: Any = None,
     ) -> None:
+        """
+        Initialize a fake HTTP response.
+
+        Parameters:
+            status_code (int): Fake HTTP status code.
+            text (str): Fake response body text.
+            payload (Any): Fake JSON payload.
+        """
         self.status_code = status_code
         self.text = text
         self.payload = payload if payload is not None else {}
 
     def json(self) -> Any:
+        """
+        Return the fake JSON payload.
+
+        Returns:
+            Any: Fake JSON payload.
+        """
         return self.payload
 
     def raise_for_status(self) -> None:
+        """
+        Simulate raising an HTTP error.
+        """
         raise RuntimeError("Fake HTTP error")
 
 
 # Minimal fake requests session.
 class FakeSession:
+    """
+    A fake requests session for testing USD-M Futures client requests.
+
+    Attributes:
+        response (FakeResponse): Fake response to return.
+        last_request (dict[str, Any] | None): Last captured request arguments.
+    """
+
     def __init__(self, response: FakeResponse) -> None:
+        """
+        Initialize a fake requests session.
+
+        Parameters:
+            response (FakeResponse): Fake response to return.
+        """
         self.response = response
         self.last_request: dict[str, Any] | None = None
 
@@ -37,6 +85,19 @@ class FakeSession:
         headers: dict[str, str] | None = None,
         timeout: int | None = None,
     ) -> FakeResponse:
+        """
+        Capture and return a fake HTTP request.
+
+        Parameters:
+            method (str): HTTP request method.
+            url (str): Request URL.
+            params (dict[str, Any] | None): Query parameters.
+            headers (dict[str, str] | None): HTTP headers.
+            timeout (int | None): Request timeout in seconds.
+
+        Returns:
+            FakeResponse: Fake HTTP response.
+        """
         self.last_request = {
             "method": method,
             "url": url,
@@ -52,6 +113,16 @@ def create_client_with_fake_session(
     response: FakeResponse,
     testnet: bool = True,
 ) -> tuple[UsdMFuturesClient, FakeSession]:
+    """
+    Create a USD-M Futures client with a fake HTTP session.
+
+    Parameters:
+        response (FakeResponse): Fake response to return from the session.
+        testnet (bool): Whether to initialize the client in testnet mode.
+
+    Returns:
+        tuple[UsdMFuturesClient, FakeSession]: Futures client and fake session.
+    """
     client = UsdMFuturesClient(
         testnet=testnet,
         api_key="fake_key",
@@ -65,6 +136,12 @@ def create_client_with_fake_session(
 
 
 def assert_signed_request(request: dict[str, Any]) -> None:
+    """
+    Assert that a request contains Binance signing fields.
+
+    Parameters:
+        request (dict[str, Any]): Captured fake request.
+    """
     assert request["headers"] == {
         "X-MBX-APIKEY": "fake_key",
     }
@@ -75,10 +152,19 @@ def assert_signed_request(request: dict[str, Any]) -> None:
 
 
 def assert_no_request(fake_session: FakeSession) -> None:
+    """
+    Assert that no HTTP request was sent.
+
+    Parameters:
+        fake_session (FakeSession): Fake session to inspect.
+    """
     assert fake_session.last_request is None
 
 
 def test_usd_m_futures_client_ping_returns_true() -> None:
+    """
+    Test that USD-M Futures ping returns True.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -97,6 +183,9 @@ def test_usd_m_futures_client_ping_returns_true() -> None:
 
 
 def test_usd_m_futures_client_get_server_time_returns_integer() -> None:
+    """
+    Test that USD-M Futures server time returns an integer.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -115,6 +204,9 @@ def test_usd_m_futures_client_get_server_time_returns_integer() -> None:
 
 
 def test_usd_m_futures_client_get_server_time_raises_for_non_integer() -> None:
+    """
+    Test that USD-M Futures server time rejects non-integer values.
+    """
     client, _ = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -128,6 +220,9 @@ def test_usd_m_futures_client_get_server_time_raises_for_non_integer() -> None:
 
 
 def test_usd_m_futures_client_get_account_info_uses_signed_request() -> None:
+    """
+    Test that USD-M Futures account info uses a signed request.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -148,6 +243,9 @@ def test_usd_m_futures_client_get_account_info_uses_signed_request() -> None:
 
 
 def test_usd_m_futures_client_get_account_balance_uses_expected_endpoint() -> None:
+    """
+    Test that USD-M Futures account balance uses the expected endpoint.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -168,6 +266,9 @@ def test_usd_m_futures_client_get_account_balance_uses_expected_endpoint() -> No
 
 
 def test_usd_m_futures_client_get_position_risk_without_symbol() -> None:
+    """
+    Test that USD-M Futures position risk lookup works without symbol.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -189,6 +290,9 @@ def test_usd_m_futures_client_get_position_risk_without_symbol() -> None:
 
 
 def test_usd_m_futures_client_get_position_risk_with_symbol() -> None:
+    """
+    Test that USD-M Futures position risk lookup works with symbol.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -210,6 +314,9 @@ def test_usd_m_futures_client_get_position_risk_with_symbol() -> None:
 
 
 def test_usd_m_futures_client_get_position_mode_uses_expected_endpoint() -> None:
+    """
+    Test that USD-M Futures position mode uses the expected endpoint.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -230,6 +337,9 @@ def test_usd_m_futures_client_get_position_mode_uses_expected_endpoint() -> None
 
 
 def test_usd_m_futures_client_change_leverage_uses_expected_params() -> None:
+    """
+    Test that USD-M Futures leverage changes use expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -255,6 +365,9 @@ def test_usd_m_futures_client_change_leverage_uses_expected_params() -> None:
 
 
 def test_usd_m_futures_client_change_margin_type_uses_expected_params() -> None:
+    """
+    Test that USD-M Futures margin type changes use expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -280,6 +393,9 @@ def test_usd_m_futures_client_change_margin_type_uses_expected_params() -> None:
 
 
 def test_usd_m_futures_client_change_margin_type_rejects_invalid_value() -> None:
+    """
+    Test that USD-M Futures margin type changes reject invalid values.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -292,6 +408,9 @@ def test_usd_m_futures_client_change_margin_type_rejects_invalid_value() -> None
 
 
 def test_usd_m_futures_client_place_order_uses_test_order_endpoint() -> None:
+    """
+    Test that USD-M Futures order validation uses the test endpoint.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -327,6 +446,9 @@ def test_usd_m_futures_client_place_order_uses_test_order_endpoint() -> None:
 def test_usd_m_futures_client_place_testnet_order_allowed_when_trading_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """
+    Test that real testnet Futures orders are allowed when trading is disabled.
+    """
     monkeypatch.setattr(
         "src.binance.usd_m_futures_client.ENABLE_TRADING",
         False,
@@ -364,6 +486,9 @@ def test_usd_m_futures_client_place_testnet_order_allowed_when_trading_disabled(
 def test_usd_m_futures_client_place_live_order_raises_when_trading_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """
+    Test that live USD-M Futures orders are blocked when trading is disabled.
+    """
     monkeypatch.setattr(
         "src.binance.usd_m_futures_client.ENABLE_TRADING",
         False,
@@ -389,6 +514,9 @@ def test_usd_m_futures_client_place_live_order_raises_when_trading_disabled(
 
 
 def test_usd_m_futures_client_place_order_requires_side() -> None:
+    """
+    Test that USD-M Futures order placement requires a side.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -404,6 +532,9 @@ def test_usd_m_futures_client_place_order_requires_side() -> None:
 
 
 def test_usd_m_futures_client_place_order_requires_type() -> None:
+    """
+    Test that USD-M Futures order placement requires a type.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -419,6 +550,9 @@ def test_usd_m_futures_client_place_order_requires_type() -> None:
 
 
 def test_usd_m_futures_client_place_limit_order_builds_expected_params() -> None:
+    """
+    Test that USD-M Futures limit orders build expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_limit_order(
@@ -450,6 +584,9 @@ def test_usd_m_futures_client_place_limit_order_builds_expected_params() -> None
 
 
 def test_usd_m_futures_client_place_market_order_builds_expected_params() -> None:
+    """
+    Test that USD-M Futures market orders build expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_market_order(
@@ -475,6 +612,9 @@ def test_usd_m_futures_client_place_market_order_builds_expected_params() -> Non
 
 
 def test_usd_m_futures_client_place_stop_order_builds_expected_params() -> None:
+    """
+    Test that USD-M Futures stop orders build expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_stop_order(
@@ -503,6 +643,9 @@ def test_usd_m_futures_client_place_stop_order_builds_expected_params() -> None:
 
 
 def test_usd_m_futures_client_place_stop_market_order_with_quantity() -> None:
+    """
+    Test that USD-M Futures stop market orders support quantity.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_stop_market_order(
@@ -528,6 +671,9 @@ def test_usd_m_futures_client_place_stop_market_order_with_quantity() -> None:
 
 
 def test_usd_m_futures_client_place_stop_market_order_with_close_position() -> None:
+    """
+    Test that USD-M Futures stop market orders support close-position mode.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_stop_market_order(
@@ -552,6 +698,9 @@ def test_usd_m_futures_client_place_stop_market_order_with_close_position() -> N
 def test_usd_m_futures_client_place_stop_market_order_requires_quantity_or_close() -> (
     None
 ):
+    """
+    Test that USD-M Futures stop market orders require quantity or close-position.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -565,6 +714,9 @@ def test_usd_m_futures_client_place_stop_market_order_requires_quantity_or_close
 
 
 def test_usd_m_futures_client_place_take_profit_order_builds_expected_params() -> None:
+    """
+    Test that USD-M Futures take profit orders build expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_take_profit_order(
@@ -588,6 +740,9 @@ def test_usd_m_futures_client_place_take_profit_order_builds_expected_params() -
 
 
 def test_usd_m_futures_client_place_take_profit_market_order_with_quantity() -> None:
+    """
+    Test that USD-M Futures take profit market orders support quantity.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_take_profit_market_order(
@@ -611,6 +766,9 @@ def test_usd_m_futures_client_place_take_profit_market_order_with_quantity() -> 
 def test_usd_m_futures_client_place_take_profit_market_order_with_close_position() -> (
     None
 ):
+    """
+    Test that USD-M Futures take profit market orders support close-position mode.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_take_profit_market_order(
@@ -633,6 +791,9 @@ def test_usd_m_futures_client_place_take_profit_market_order_with_close_position
 
 
 def test_usd_m_futures_client_place_trailing_stop_market_order() -> None:
+    """
+    Test that USD-M Futures trailing stop market orders build expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_trailing_stop_market_order(
@@ -658,6 +819,9 @@ def test_usd_m_futures_client_place_trailing_stop_market_order() -> None:
 
 
 def test_usd_m_futures_client_rejects_invalid_position_side() -> None:
+    """
+    Test that USD-M Futures orders reject invalid position sides.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -673,6 +837,9 @@ def test_usd_m_futures_client_rejects_invalid_position_side() -> None:
 
 
 def test_usd_m_futures_client_rejects_invalid_working_type() -> None:
+    """
+    Test that USD-M Futures orders reject invalid working types.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -689,6 +856,9 @@ def test_usd_m_futures_client_rejects_invalid_working_type() -> None:
 
 
 def test_usd_m_futures_client_rejects_invalid_new_order_resp_type() -> None:
+    """
+    Test that USD-M Futures orders reject invalid response types.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -704,6 +874,9 @@ def test_usd_m_futures_client_rejects_invalid_new_order_resp_type() -> None:
 
 
 def test_usd_m_futures_client_get_order_with_order_id() -> None:
+    """
+    Test that USD-M Futures order lookup works with order ID.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -729,6 +902,9 @@ def test_usd_m_futures_client_get_order_with_order_id() -> None:
 
 
 def test_usd_m_futures_client_get_order_with_client_order_id() -> None:
+    """
+    Test that USD-M Futures order lookup works with client order ID.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -754,6 +930,9 @@ def test_usd_m_futures_client_get_order_with_client_order_id() -> None:
 
 
 def test_usd_m_futures_client_get_order_requires_identifier() -> None:
+    """
+    Test that USD-M Futures order lookup requires one identifier.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -763,6 +942,9 @@ def test_usd_m_futures_client_get_order_requires_identifier() -> None:
 
 
 def test_usd_m_futures_client_get_order_rejects_two_identifiers() -> None:
+    """
+    Test that USD-M Futures order lookup rejects two identifiers.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -776,6 +958,9 @@ def test_usd_m_futures_client_get_order_rejects_two_identifiers() -> None:
 
 
 def test_usd_m_futures_client_get_open_orders_without_symbol() -> None:
+    """
+    Test that USD-M Futures open order lookup works without symbol.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -797,6 +982,9 @@ def test_usd_m_futures_client_get_open_orders_without_symbol() -> None:
 
 
 def test_usd_m_futures_client_get_open_orders_with_symbol() -> None:
+    """
+    Test that USD-M Futures open order lookup works with symbol.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -818,6 +1006,9 @@ def test_usd_m_futures_client_get_open_orders_with_symbol() -> None:
 
 
 def test_usd_m_futures_client_get_all_orders_uses_expected_params() -> None:
+    """
+    Test that USD-M Futures all-order lookup uses expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -849,6 +1040,9 @@ def test_usd_m_futures_client_get_all_orders_uses_expected_params() -> None:
 
 
 def test_usd_m_futures_client_cancel_order_with_order_id() -> None:
+    """
+    Test that USD-M Futures order cancellation works with order ID.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -880,6 +1074,9 @@ def test_usd_m_futures_client_cancel_order_with_order_id() -> None:
 
 
 def test_usd_m_futures_client_cancel_order_with_client_order_id() -> None:
+    """
+    Test that USD-M Futures order cancellation works with client order ID.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -911,6 +1108,9 @@ def test_usd_m_futures_client_cancel_order_with_client_order_id() -> None:
 
 
 def test_usd_m_futures_client_cancel_order_requires_identifier() -> None:
+    """
+    Test that USD-M Futures order cancellation requires one identifier.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -920,6 +1120,9 @@ def test_usd_m_futures_client_cancel_order_requires_identifier() -> None:
 
 
 def test_usd_m_futures_client_cancel_order_rejects_two_identifiers() -> None:
+    """
+    Test that USD-M Futures order cancellation rejects two identifiers.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -933,6 +1136,9 @@ def test_usd_m_futures_client_cancel_order_rejects_two_identifiers() -> None:
 
 
 def test_usd_m_futures_client_cancel_all_open_orders_uses_expected_endpoint() -> None:
+    """
+    Test that USD-M Futures open-order cancellation uses the expected endpoint.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -954,6 +1160,9 @@ def test_usd_m_futures_client_cancel_all_open_orders_uses_expected_endpoint() ->
 
 
 def test_usd_m_futures_client_get_my_trades_uses_expected_params() -> None:
+    """
+    Test that USD-M Futures account trade lookup uses expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,

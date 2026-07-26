@@ -1,3 +1,11 @@
+# SQLite storage helpers for raw Binance trade data.
+"""
+Provide raw trade database utilities.
+
+This module creates daily SQLite trade databases and inserts Binance trade
+messages into the trades table.
+"""
+
 import json
 import sqlite3
 from datetime import UTC, datetime
@@ -5,11 +13,29 @@ from pathlib import Path
 
 
 def daily_database_path(database_dir: str) -> str:
+    """
+    Return the daily raw trade database path.
+
+    Parameters:
+        database_dir (str): Directory for raw SQLite database files.
+
+    Returns:
+        str: Daily SQLite database path.
+    """
     date_str = datetime.now(UTC).strftime("%Y_%m_%d")
     return str(Path(database_dir) / f"trades_{date_str}.sqlite")
 
 
 def connect_db(database_path: str) -> sqlite3.Connection:
+    """
+    Open and initialize a raw trade SQLite database.
+
+    Parameters:
+        database_path (str): SQLite database path.
+
+    Returns:
+        sqlite3.Connection: Open SQLite database connection.
+    """
     Path(database_path).parent.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(database_path, timeout=30)
@@ -54,6 +80,13 @@ def connect_db(database_path: str) -> sqlite3.Connection:
 
 
 def insert_trades(conn: sqlite3.Connection, messages: list[dict]) -> None:
+    """
+    Insert Binance trade messages into the trades table.
+
+    Parameters:
+        conn (sqlite3.Connection): Open SQLite database connection.
+        messages (list[dict]): Binance trade messages.
+    """
     rows = [
         (
             msg["e"],

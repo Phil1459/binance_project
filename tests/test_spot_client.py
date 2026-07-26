@@ -1,3 +1,11 @@
+# Unit tests for the Binance Spot REST client.
+"""
+Provide tests for the Binance Spot REST client.
+
+This module tests public endpoints, signed account requests, order placement,
+order-list placement, order queries, cancellations, and account trade queries.
+"""
+
 from typing import Any
 
 import pytest
@@ -6,26 +14,66 @@ from src.binance.spot_client import SpotClient
 
 # Minimal fake HTTP response.
 class FakeResponse:
+    """
+    A fake HTTP response for testing Spot client behavior.
+
+    Attributes:
+        status_code (int): Fake HTTP status code.
+        text (str): Fake response body text.
+        payload (Any): Fake JSON payload.
+    """
+
     def __init__(
         self,
         status_code: int = 200,
         text: str = "{}",
         payload: Any = None,
     ) -> None:
+        """
+        Initialize a fake HTTP response.
+
+        Parameters:
+            status_code (int): Fake HTTP status code.
+            text (str): Fake response body text.
+            payload (Any): Fake JSON payload.
+        """
         self.status_code = status_code
         self.text = text
         self.payload = payload if payload is not None else {}
 
     def json(self) -> Any:
+        """
+        Return the fake JSON payload.
+
+        Returns:
+            Any: Fake JSON payload.
+        """
         return self.payload
 
     def raise_for_status(self) -> None:
+        """
+        Simulate raising an HTTP error.
+        """
         raise RuntimeError("Fake HTTP error")
 
 
 # Minimal fake requests session.
 class FakeSession:
+    """
+    A fake requests session for testing Spot client requests.
+
+    Attributes:
+        response (FakeResponse): Fake response to return.
+        last_request (dict[str, Any] | None): Last captured request arguments.
+    """
+
     def __init__(self, response: FakeResponse) -> None:
+        """
+        Initialize a fake requests session.
+
+        Parameters:
+            response (FakeResponse): Fake response to return.
+        """
         self.response = response
         self.last_request: dict[str, Any] | None = None
 
@@ -37,6 +85,19 @@ class FakeSession:
         headers: dict[str, str] | None = None,
         timeout: int | None = None,
     ) -> FakeResponse:
+        """
+        Capture and return a fake HTTP request.
+
+        Parameters:
+            method (str): HTTP request method.
+            url (str): Request URL.
+            params (dict[str, Any] | None): Query parameters.
+            headers (dict[str, str] | None): HTTP headers.
+            timeout (int | None): Request timeout in seconds.
+
+        Returns:
+            FakeResponse: Fake HTTP response.
+        """
         self.last_request = {
             "method": method,
             "url": url,
@@ -52,6 +113,16 @@ def create_client_with_fake_session(
     response: FakeResponse,
     testnet: bool = True,
 ) -> tuple[SpotClient, FakeSession]:
+    """
+    Create a Spot client with a fake HTTP session.
+
+    Parameters:
+        response (FakeResponse): Fake response to return from the session.
+        testnet (bool): Whether to initialize the client in testnet mode.
+
+    Returns:
+        tuple[SpotClient, FakeSession]: Spot client and fake session.
+    """
     client = SpotClient(
         testnet=testnet,
         api_key="fake_key",
@@ -65,6 +136,12 @@ def create_client_with_fake_session(
 
 
 def assert_signed_request(request: dict[str, Any]) -> None:
+    """
+    Assert that a request contains Binance signing fields.
+
+    Parameters:
+        request (dict[str, Any]): Captured fake request.
+    """
     assert request["headers"] == {
         "X-MBX-APIKEY": "fake_key",
     }
@@ -75,10 +152,19 @@ def assert_signed_request(request: dict[str, Any]) -> None:
 
 
 def assert_no_request(fake_session: FakeSession) -> None:
+    """
+    Assert that no HTTP request was sent.
+
+    Parameters:
+        fake_session (FakeSession): Fake session to inspect.
+    """
     assert fake_session.last_request is None
 
 
 def test_spot_client_ping_returns_true() -> None:
+    """
+    Test that Spot ping returns True.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -97,6 +183,9 @@ def test_spot_client_ping_returns_true() -> None:
 
 
 def test_spot_client_get_server_time_returns_integer() -> None:
+    """
+    Test that Spot server time returns an integer.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -115,6 +204,9 @@ def test_spot_client_get_server_time_returns_integer() -> None:
 
 
 def test_spot_client_get_server_time_raises_for_non_integer() -> None:
+    """
+    Test that Spot server time rejects non-integer values.
+    """
     client, _ = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -128,6 +220,9 @@ def test_spot_client_get_server_time_raises_for_non_integer() -> None:
 
 
 def test_spot_client_get_account_info_uses_signed_request() -> None:
+    """
+    Test that Spot account info uses a signed request.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -148,6 +243,9 @@ def test_spot_client_get_account_info_uses_signed_request() -> None:
 
 
 def test_spot_client_place_order_uses_test_order_endpoint() -> None:
+    """
+    Test that Spot order validation uses the test endpoint.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -184,6 +282,9 @@ def test_spot_client_place_order_uses_test_order_endpoint() -> None:
 
 
 def test_spot_client_place_order_requires_symbol() -> None:
+    """
+    Test that Spot order placement requires a symbol.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -199,6 +300,9 @@ def test_spot_client_place_order_requires_symbol() -> None:
 
 
 def test_spot_client_place_order_requires_string_symbol() -> None:
+    """
+    Test that Spot order placement requires a string symbol.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(TypeError):
@@ -217,6 +321,9 @@ def test_spot_client_place_order_requires_string_symbol() -> None:
 def test_spot_client_place_testnet_order_allowed_when_trading_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """
+    Test that real testnet orders are allowed when live trading is disabled.
+    """
     monkeypatch.setattr(
         "src.binance.spot_client.ENABLE_TRADING",
         False,
@@ -254,6 +361,9 @@ def test_spot_client_place_testnet_order_allowed_when_trading_disabled(
 def test_spot_client_place_live_order_raises_when_trading_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """
+    Test that live Spot orders are blocked when trading is disabled.
+    """
     monkeypatch.setattr(
         "src.binance.spot_client.ENABLE_TRADING",
         False,
@@ -281,6 +391,9 @@ def test_spot_client_place_live_order_raises_when_trading_disabled(
 def test_spot_client_place_live_order_uses_live_order_endpoint_when_enabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """
+    Test that enabled real Spot orders use the live order endpoint.
+    """
     monkeypatch.setattr(
         "src.binance.spot_client.ENABLE_TRADING",
         True,
@@ -316,6 +429,9 @@ def test_spot_client_place_live_order_uses_live_order_endpoint_when_enabled(
 
 
 def test_spot_client_place_limit_order_builds_expected_params() -> None:
+    """
+    Test that Spot limit orders build the expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_limit_order(
@@ -343,6 +459,9 @@ def test_spot_client_place_limit_order_builds_expected_params() -> None:
 
 
 def test_spot_client_place_market_order_with_quantity_builds_expected_params() -> None:
+    """
+    Test that Spot market orders with quantity build expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_market_order(
@@ -366,6 +485,9 @@ def test_spot_client_place_market_order_with_quantity_builds_expected_params() -
 
 
 def test_spot_client_place_market_order_with_quote_qty_builds_expected_params() -> None:
+    """
+    Test that Spot market orders with quote quantity build expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_market_order(
@@ -387,6 +509,9 @@ def test_spot_client_place_market_order_with_quote_qty_builds_expected_params() 
 
 
 def test_spot_client_place_market_order_requires_one_quantity_type() -> None:
+    """
+    Test that Spot market orders require one quantity type.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -399,6 +524,9 @@ def test_spot_client_place_market_order_requires_one_quantity_type() -> None:
 
 
 def test_spot_client_place_market_order_rejects_two_quantity_types() -> None:
+    """
+    Test that Spot market orders reject two quantity types.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -413,6 +541,9 @@ def test_spot_client_place_market_order_rejects_two_quantity_types() -> None:
 
 
 def test_spot_client_place_limit_maker_order_builds_expected_params() -> None:
+    """
+    Test that Spot limit maker orders build expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_limit_maker_order(
@@ -436,6 +567,9 @@ def test_spot_client_place_limit_maker_order_builds_expected_params() -> None:
 
 
 def test_spot_client_place_stop_loss_order_builds_expected_params() -> None:
+    """
+    Test that Spot stop loss orders build expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_stop_loss_order(
@@ -457,6 +591,9 @@ def test_spot_client_place_stop_loss_order_builds_expected_params() -> None:
 
 
 def test_spot_client_place_stop_loss_order_with_trailing_delta() -> None:
+    """
+    Test that Spot stop loss orders accept trailing delta.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_stop_loss_order(
@@ -476,6 +613,9 @@ def test_spot_client_place_stop_loss_order_with_trailing_delta() -> None:
 
 
 def test_spot_client_place_stop_loss_order_requires_trigger() -> None:
+    """
+    Test that Spot stop loss orders require a trigger.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -489,6 +629,9 @@ def test_spot_client_place_stop_loss_order_requires_trigger() -> None:
 
 
 def test_spot_client_place_stop_loss_limit_order_builds_expected_params() -> None:
+    """
+    Test that Spot stop loss limit orders build expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_stop_loss_limit_order(
@@ -515,6 +658,9 @@ def test_spot_client_place_stop_loss_limit_order_builds_expected_params() -> Non
 
 
 def test_spot_client_place_take_profit_order_builds_expected_params() -> None:
+    """
+    Test that Spot take profit orders build expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_take_profit_order(
@@ -536,6 +682,9 @@ def test_spot_client_place_take_profit_order_builds_expected_params() -> None:
 
 
 def test_spot_client_place_take_profit_limit_order_builds_expected_params() -> None:
+    """
+    Test that Spot take profit limit orders build expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     client.place_take_profit_limit_order(
@@ -562,6 +711,9 @@ def test_spot_client_place_take_profit_limit_order_builds_expected_params() -> N
 
 
 def test_spot_client_place_convenience_order_rejects_invalid_side() -> None:
+    """
+    Test that Spot convenience orders reject invalid sides.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -576,6 +728,9 @@ def test_spot_client_place_convenience_order_rejects_invalid_side() -> None:
 
 
 def test_spot_client_place_oco_order_uses_oco_endpoint() -> None:
+    """
+    Test that Spot OCO order lists use the OCO endpoint.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -610,6 +765,9 @@ def test_spot_client_place_oco_order_uses_oco_endpoint() -> None:
 
 
 def test_spot_client_place_oto_order_uses_oto_endpoint() -> None:
+    """
+    Test that Spot OTO order lists use the OTO endpoint.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -644,6 +802,9 @@ def test_spot_client_place_oto_order_uses_oto_endpoint() -> None:
 
 
 def test_spot_client_place_otoco_order_uses_otoco_endpoint() -> None:
+    """
+    Test that Spot OTOCO order lists use the OTOCO endpoint.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -684,6 +845,9 @@ def test_spot_client_place_otoco_order_uses_otoco_endpoint() -> None:
 def test_spot_client_place_order_list_raises_when_live_trading_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """
+    Test that live Spot order lists are blocked when trading is disabled.
+    """
     monkeypatch.setattr(
         "src.binance.spot_client.ENABLE_TRADING",
         False,
@@ -707,6 +871,9 @@ def test_spot_client_place_order_list_raises_when_live_trading_disabled(
 
 
 def test_spot_client_get_order_with_order_id() -> None:
+    """
+    Test that Spot order lookup works with order ID.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -732,6 +899,9 @@ def test_spot_client_get_order_with_order_id() -> None:
 
 
 def test_spot_client_get_order_with_client_order_id() -> None:
+    """
+    Test that Spot order lookup works with client order ID.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -757,6 +927,9 @@ def test_spot_client_get_order_with_client_order_id() -> None:
 
 
 def test_spot_client_get_order_requires_identifier() -> None:
+    """
+    Test that Spot order lookup requires one identifier.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -766,6 +939,9 @@ def test_spot_client_get_order_requires_identifier() -> None:
 
 
 def test_spot_client_get_order_rejects_two_identifiers() -> None:
+    """
+    Test that Spot order lookup rejects two identifiers.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -779,6 +955,9 @@ def test_spot_client_get_order_rejects_two_identifiers() -> None:
 
 
 def test_spot_client_get_open_orders_without_symbol() -> None:
+    """
+    Test that Spot open order lookup works without symbol.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -800,6 +979,9 @@ def test_spot_client_get_open_orders_without_symbol() -> None:
 
 
 def test_spot_client_get_open_orders_with_symbol() -> None:
+    """
+    Test that Spot open order lookup works with symbol.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -821,6 +1003,9 @@ def test_spot_client_get_open_orders_with_symbol() -> None:
 
 
 def test_spot_client_get_all_orders_uses_expected_params() -> None:
+    """
+    Test that Spot all-order lookup uses expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -852,6 +1037,9 @@ def test_spot_client_get_all_orders_uses_expected_params() -> None:
 
 
 def test_spot_client_cancel_order_with_order_id() -> None:
+    """
+    Test that Spot order cancellation works with order ID.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -883,6 +1071,9 @@ def test_spot_client_cancel_order_with_order_id() -> None:
 
 
 def test_spot_client_cancel_order_with_client_order_id() -> None:
+    """
+    Test that Spot order cancellation works with client order ID.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -914,6 +1105,9 @@ def test_spot_client_cancel_order_with_client_order_id() -> None:
 
 
 def test_spot_client_cancel_order_requires_identifier() -> None:
+    """
+    Test that Spot order cancellation requires one identifier.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -923,6 +1117,9 @@ def test_spot_client_cancel_order_requires_identifier() -> None:
 
 
 def test_spot_client_cancel_order_rejects_two_identifiers() -> None:
+    """
+    Test that Spot order cancellation rejects two identifiers.
+    """
     client, fake_session = create_client_with_fake_session(response=FakeResponse())
 
     with pytest.raises(ValueError):
@@ -936,6 +1133,9 @@ def test_spot_client_cancel_order_rejects_two_identifiers() -> None:
 
 
 def test_spot_client_cancel_all_open_orders_uses_expected_endpoint() -> None:
+    """
+    Test that Spot open-order cancellation uses the expected endpoint.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
@@ -957,6 +1157,9 @@ def test_spot_client_cancel_all_open_orders_uses_expected_endpoint() -> None:
 
 
 def test_spot_client_get_my_trades_uses_expected_params() -> None:
+    """
+    Test that Spot account trade lookup uses expected parameters.
+    """
     client, fake_session = create_client_with_fake_session(
         response=FakeResponse(
             status_code=200,
