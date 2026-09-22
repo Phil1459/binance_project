@@ -1,20 +1,22 @@
-# Build 15-second OHLCV bars from raw trade databases.
+# Build 1-second OHLCV bars from raw trade databases.
 """
 Provide the bar build pipeline.
 
-This module reads raw SQLite trade files and writes per-symbol 15-second bar
+This module reads raw SQLite trade files and writes per-symbol 1-second bar
 Parquet files.
 """
 
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pandas as pd
 from config.logging_setup import setup_logger
 from config.settings import PROCESSED_DIR, RAW_DIR
 
-BAR_INTERVAL = "15s"
-BAR_INTERVAL_MS = 15_000
+BAR_INTERVAL = "1s"
+BAR_INTERVAL_MS = 1_000
+FETCH_SIZE = 50_000
 
 
 logger = setup_logger(
@@ -83,6 +85,10 @@ def build_bars_for_symbol(
     """
     Build and save bars for one symbol from a raw database.
 
+    Trades are read sequentially in exchange trade ID order and aggregated in
+    one pass. Missing seconds between trades are filled with flat zero-volume
+    bars using the previous close.
+
     Parameters:
         conn (sqlite3.Connection): Open SQLite database connection.
         symbol (str): Trading pair symbol.
@@ -97,10 +103,8 @@ def build_bars_for_symbol(
         output_path,
     )
 
-    query = f"""
-    WITH symbol_trades AS (
+    query = """
         SELECT
-            symbol,
             trade_time,
             exchange_trade_id,
             price,
@@ -108,88 +112,149 @@ def build_bars_for_symbol(
             is_buyer_maker
         FROM trades
         WHERE symbol = ?
-    ),
-    bucketed AS (
-        SELECT
-            symbol,
-            (trade_time / {BAR_INTERVAL_MS}) * {BAR_INTERVAL_MS} AS bucket_time,
-            trade_time,
-            exchange_trade_id,
-            price,
-            quantity,
-            is_buyer_maker
-        FROM symbol_trades
-    ),
-    base AS (
-        SELECT
-            symbol,
-            bucket_time,
-            MIN(price) AS low,
-            MAX(price) AS high,
-            SUM(price * quantity) / SUM(quantity) AS vwap,
-            SUM(quantity) AS volume,
-            SUM(CASE WHEN is_buyer_maker = 0 THEN quantity ELSE 0 END) AS buy_volume,
-            SUM(CASE WHEN is_buyer_maker = 1 THEN quantity ELSE 0 END) AS sell_volume,
-            COUNT(*) AS trade_count
-        FROM bucketed
-        GROUP BY symbol, bucket_time
-    ),
-    open_close_times AS (
-        SELECT
-            symbol,
-            bucket_time,
-            MIN(exchange_trade_id) AS open_trade_id,
-            MAX(exchange_trade_id) AS close_trade_id
-        FROM bucketed
-        GROUP BY symbol, bucket_time
-    ),
-    opens AS (
-        SELECT
-            b.symbol,
-            b.bucket_time,
-            b.price AS open
-        FROM bucketed b
-        JOIN open_close_times oct
-            ON b.symbol = oct.symbol
-            AND b.bucket_time = oct.bucket_time
-            AND b.exchange_trade_id = oct.open_trade_id
-    ),
-    closes AS (
-        SELECT
-            b.symbol,
-            b.bucket_time,
-            b.price AS close
-        FROM bucketed b
-        JOIN open_close_times oct
-            ON b.symbol = oct.symbol
-            AND b.bucket_time = oct.bucket_time
-            AND b.exchange_trade_id = oct.close_trade_id
-    )
-    SELECT
-        base.symbol,
-        datetime(base.bucket_time / 1000, 'unixepoch') AS timestamp,
-        opens.open,
-        base.high,
-        base.low,
-        closes.close,
-        base.vwap,
-        base.volume,
-        base.buy_volume,
-        base.sell_volume,
-        base.trade_count
-    FROM base
-    JOIN opens
-        ON base.symbol = opens.symbol
-        AND base.bucket_time = opens.bucket_time
-    JOIN closes
-        ON base.symbol = closes.symbol
-        AND base.bucket_time = closes.bucket_time
-    ORDER BY base.bucket_time;
+        ORDER BY exchange_trade_id;
     """
 
-    df = pd.read_sql_query(query, conn, params=(symbol,))
+    cursor = conn.execute(query, (symbol,))
 
-    if df.empty:
+    bars = []
+
+    current_bucket = None
+    current_open = None
+    current_high = None
+    current_low = None
+    current_close = None
+    current_price_quantity_sum = 0.0
+    current_volume = 0.0
+    current_buy_volume = 0.0
+    current_sell_volume = 0.0
+    current_trade_count = 0
+
+    while rows := cursor.fetchmany(FETCH_SIZE):
+        for (
+            trade_time,
+            _exchange_trade_id,
+            price,
+            quantity,
+            is_buyer_maker,
+        ) in rows:
+            bucket_time = (trade_time // BAR_INTERVAL_MS) * BAR_INTERVAL_MS
+
+            if current_bucket is None:
+                current_bucket = bucket_time
+                current_open = price
+                current_high = price
+                current_low = price
+                current_close = price
+                current_price_quantity_sum = price * quantity
+                current_volume = quantity
+                current_buy_volume = quantity if is_buyer_maker == 0 else 0.0
+                current_sell_volume = quantity if is_buyer_maker == 1 else 0.0
+                current_trade_count = 1
+                continue
+
+            if bucket_time < current_bucket:
+                raise ValueError(
+                    "Trade time moved backwards "
+                    f"symbol={symbol} "
+                    f"current_bucket={current_bucket} "
+                    f"trade_bucket={bucket_time}"
+                )
+
+            if bucket_time > current_bucket:
+                current_vwap = (
+                    current_price_quantity_sum / current_volume
+                    if current_volume > 0
+                    else float("nan")
+                )
+
+                bars.append(
+                    (
+                        symbol,
+                        current_bucket,
+                        current_open,
+                        current_high,
+                        current_low,
+                        current_close,
+                        current_vwap,
+                        current_volume,
+                        current_buy_volume,
+                        current_sell_volume,
+                        current_trade_count,
+                    )
+                )
+
+                previous_close = current_close
+                missing_bucket = current_bucket + BAR_INTERVAL_MS
+
+                while missing_bucket < bucket_time:
+                    bars.append(
+                        (
+                            symbol,
+                            missing_bucket,
+                            previous_close,
+                            previous_close,
+                            previous_close,
+                            previous_close,
+                            float("nan"),
+                            0.0,
+                            0.0,
+                            0.0,
+                            0,
+                        )
+                    )
+
+                    missing_bucket += BAR_INTERVAL_MS
+
+                current_bucket = bucket_time
+                current_open = price
+                current_high = price
+                current_low = price
+                current_close = price
+                current_price_quantity_sum = price * quantity
+                current_volume = quantity
+                current_buy_volume = quantity if is_buyer_maker == 0 else 0.0
+                current_sell_volume = quantity if is_buyer_maker == 1 else 0.0
+                current_trade_count = 1
+                continue
+
+            current_high = max(current_high, price)
+            current_low = min(current_low, price)
+            current_close = price
+            current_price_quantity_sum += price * quantity
+            current_volume += quantity
+
+            if is_buyer_maker == 0:
+                current_buy_volume += quantity
+            else:
+                current_sell_volume += quantity
+
+            current_trade_count += 1
+
+    if current_bucket is not None:
+        current_vwap = (
+            current_price_quantity_sum / current_volume
+            if current_volume > 0
+            else float("nan")
+        )
+
+        bars.append(
+            (
+                symbol,
+                current_bucket,
+                current_open,
+                current_high,
+                current_low,
+                current_close,
+                current_vwap,
+                current_volume,
+                current_buy_volume,
+                current_sell_volume,
+                current_trade_count,
+            )
+        )
+
+    if not bars:
         logger.warning(
             "No bars created interval=%s symbol=%s date=%s",
             BAR_INTERVAL,
@@ -198,7 +263,28 @@ def build_bars_for_symbol(
         )
         return
 
-    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+    df = pd.DataFrame(
+        bars,
+        columns=[
+            "symbol",
+            "timestamp",
+            "open",
+            "high",
+            "low",
+            "close",
+            "vwap",
+            "volume",
+            "buy_volume",
+            "sell_volume",
+            "trade_count",
+        ],
+    )
+
+    df["timestamp"] = pd.to_datetime(
+        df["timestamp"],
+        unit="ms",
+        utc=True,
+    )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(output_path, index=False)
@@ -230,14 +316,12 @@ def build_bars_for_file(raw_db_path: Path) -> None:
         raw_db_path,
     )
 
-    with sqlite3.connect(raw_db_path) as conn:
+    with closing(sqlite3.connect(raw_db_path)) as conn:
         logger.debug(
             "Opened database path=%s",
             raw_db_path,
         )
 
-        # To reduce runtime
-        conn.execute("PRAGMA temp_store=MEMORY;")
         conn.execute("PRAGMA cache_size=-200000;")
 
         symbols = get_symbols(conn)

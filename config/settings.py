@@ -60,3 +60,8 @@ RAW_DIR = Path(os.getenv("RAW_DIR", "data/raw"))
 PROCESSED_DIR = Path(os.getenv("PROCESSED_DIR", "data/processed"))
 
 TRADE_SIZE_USDT = float(os.getenv("TRADE_SIZE_USDT", float(25)))
+
+# Live processing
+TRADE_QUEUE_MAX_SIZE = int(os.getenv("TRADE_QUEUE_MAX_SIZE", "100000"))
+CUTOVER_TIMEOUT_SECONDS = float(os.getenv("CUTOVER_TIMEOUT_SECONDS", "30.0"))
+STATUS_LOG_INTERVAL_SECONDS = float(os.getenv("STATUS_LOG_INTERVAL_SECONDS", "10.0"))

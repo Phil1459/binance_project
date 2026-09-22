@@ -1,21 +1,23 @@
-# Build 15-second price distributions from raw trade databases.
+# Build 1-second price distributions from raw trade databases.
 """
 Provide the price distribution build pipeline.
 
-This module reads raw SQLite trade files and writes per-symbol 15-second price
+This module reads raw SQLite trade files and writes per-symbol 1-second price
 distribution Parquet files.
 """
 
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 import pandas as pd
 from config.logging_setup import setup_logger
 from config.settings import PROCESSED_DIR, RAW_DIR
 
-INTERVAL = "15s"
-INTERVAL_MS = 15_000
+INTERVAL = "1s"
+INTERVAL_MS = 1_000
 PRICE_BUCKET_SIZE = 1
+FETCH_SIZE = 50_000
 
 
 logger = setup_logger(
@@ -84,6 +86,9 @@ def build_distribution_for_symbol(
     """
     Build and save a price distribution for one symbol.
 
+    Trades are read sequentially in exchange trade ID order and aggregated in
+    one pass. Seconds without trades do not produce distribution rows.
+
     Parameters:
         conn (sqlite3.Connection): Open SQLite database connection.
         symbol (str): Trading pair symbol.
@@ -98,51 +103,86 @@ def build_distribution_for_symbol(
         output_path,
     )
 
-    query = f"""
-    WITH bucketed AS (
+    query = """
         SELECT
-            (trade_time / {INTERVAL_MS}) * {INTERVAL_MS} AS bucket_time,
-            CAST(
-                price / {PRICE_BUCKET_SIZE}
-                AS INTEGER
-            ) * {PRICE_BUCKET_SIZE} AS price_bucket,
+            trade_time,
+            exchange_trade_id,
+            price,
             quantity,
             is_buyer_maker
         FROM trades
         WHERE symbol = ?
-    )
-    SELECT
-        datetime(bucket_time / 1000, 'unixepoch') AS timestamp,
-        price_bucket,
-
-        SUM(
-            CASE
-                WHEN is_buyer_maker = 0
-                THEN quantity
-                ELSE 0
-            END
-        ) AS buy_volume,
-
-        SUM(
-            CASE
-                WHEN is_buyer_maker = 1
-                THEN quantity
-                ELSE 0
-            END
-        ) AS sell_volume
-
-    FROM bucketed
-    GROUP BY
-        bucket_time,
-        price_bucket
-    ORDER BY
-        bucket_time,
-        price_bucket;
+        ORDER BY exchange_trade_id;
     """
 
-    df = pd.read_sql_query(query, conn, params=(symbol,))
+    cursor = conn.execute(query, (symbol,))
 
-    if df.empty:
+    distribution_rows = []
+
+    current_bucket = None
+    current_distribution = {}
+
+    while rows := cursor.fetchmany(FETCH_SIZE):
+        for (
+            trade_time,
+            _exchange_trade_id,
+            price,
+            quantity,
+            is_buyer_maker,
+        ) in rows:
+            bucket_time = (trade_time // INTERVAL_MS) * INTERVAL_MS
+
+            if current_bucket is None:
+                current_bucket = bucket_time
+
+            if bucket_time < current_bucket:
+                raise ValueError(
+                    "Trade time moved backwards "
+                    f"symbol={symbol} "
+                    f"current_bucket={current_bucket} "
+                    f"trade_bucket={bucket_time}"
+                )
+
+            if bucket_time > current_bucket:
+                for price_bucket in sorted(current_distribution):
+                    buy_volume, sell_volume = current_distribution[price_bucket]
+
+                    distribution_rows.append(
+                        (
+                            current_bucket,
+                            price_bucket,
+                            buy_volume,
+                            sell_volume,
+                        )
+                    )
+
+                current_bucket = bucket_time
+                current_distribution = {}
+
+            price_bucket = int(price / PRICE_BUCKET_SIZE) * PRICE_BUCKET_SIZE
+
+            if price_bucket not in current_distribution:
+                current_distribution[price_bucket] = [0.0, 0.0]
+
+            if is_buyer_maker == 0:
+                current_distribution[price_bucket][0] += quantity
+            else:
+                current_distribution[price_bucket][1] += quantity
+
+    if current_bucket is not None:
+        for price_bucket in sorted(current_distribution):
+            buy_volume, sell_volume = current_distribution[price_bucket]
+
+            distribution_rows.append(
+                (
+                    current_bucket,
+                    price_bucket,
+                    buy_volume,
+                    sell_volume,
+                )
+            )
+
+    if not distribution_rows:
         logger.warning(
             "No price distribution rows interval=%s symbol=%s date=%s",
             INTERVAL,
@@ -151,7 +191,21 @@ def build_distribution_for_symbol(
         )
         return
 
-    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+    df = pd.DataFrame(
+        distribution_rows,
+        columns=[
+            "timestamp",
+            "price_bucket",
+            "buy_volume",
+            "sell_volume",
+        ],
+    )
+
+    df["timestamp"] = pd.to_datetime(
+        df["timestamp"],
+        unit="ms",
+        utc=True,
+    )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(output_path, index=False)
@@ -184,13 +238,12 @@ def build_distributions_for_file(raw_db_path: Path) -> None:
         raw_db_path,
     )
 
-    with sqlite3.connect(raw_db_path) as conn:
+    with closing(sqlite3.connect(raw_db_path)) as conn:
         logger.debug(
             "Opened database path=%s",
             raw_db_path,
         )
 
-        conn.execute("PRAGMA temp_store=MEMORY;")
         conn.execute("PRAGMA cache_size=-200000;")
 
         symbols = get_symbols(conn)
